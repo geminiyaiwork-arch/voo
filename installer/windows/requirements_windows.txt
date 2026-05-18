@@ -1,0 +1,10 @@
+; Windows-specific build dependencies for Visio Eye.
+; This is a superset of the runtime requirements.txt — it adds
+; PyInstaller (pulls in pywin32) plus sounddevice (used by the dubbing
+; engine for WASAPI loopback capture and TTS playback into a virtual
+; audio cable).
+
+-r ..\..\requirements.txt
+pyinstaller>=6.0
+pywin32>=306
+sounddevice>=0.4.6

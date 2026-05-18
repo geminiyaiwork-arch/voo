@@ -1,0 +1,44 @@
+# Build artefacts
+build/
+dist/
+*.deb
+*.exe
+*.msi
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Whisper / HF model cache (huge)
+.cache/
+
+# Bundled FFmpeg (downloaded at build time)
+installer/windows/ffmpeg/*.exe
+installer/windows/vc_redist.x64.exe
+installer/windows/ffmpeg.zip
+installer/windows/ffmpeg_tmp/
+
+# Logs
+*.log
+~/.cache/visio-eye/
+
+# Secrets / settings
+settings.json
+*.local

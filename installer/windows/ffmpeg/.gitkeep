@@ -1,0 +1,6 @@
+Drop ffmpeg.exe and ffprobe.exe (Windows static builds) into THIS folder
+before running build_windows.bat.  Download from:
+  https://www.gyan.dev/ffmpeg/builds/   (pick "release essentials" 7z)
+
+If you skip this, your end-users will need to install FFmpeg themselves
+and ensure it is on PATH.

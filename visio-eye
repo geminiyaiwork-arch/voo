@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Visio Eye launcher
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# locate the installed src directory
+if [ -d "$SCRIPT_DIR/src" ]; then
+    APP_DIR="$SCRIPT_DIR"
+elif [ -d "/opt/visio-eye/src" ]; then
+    APP_DIR="/opt/visio-eye"
+else
+    echo "visio-eye: cannot locate application files" >&2
+    exit 1
+fi
+
+# prefer python3
+PYTHON_BIN="${VISIO_EYE_PYTHON:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    echo "visio-eye: python3 is required" >&2
+    exit 1
+fi
+
+exec "$PYTHON_BIN" "$APP_DIR/src/main.py" "$@"
