@@ -16,9 +16,50 @@ import psutil
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_LINUX = sys.platform.startswith("linux")
+IS_MACOS = sys.platform == "darwin"
 
 
 _DSHOW_CACHE: dict[str, tuple[list[str], list[str]]] = {}
+_AVF_CACHE: dict[str, tuple[list[tuple[str, str]], list[tuple[str, str]]]] = {}
+
+
+def _query_avfoundation_devices() -> tuple[list[tuple[str, str]],
+                                            list[tuple[str, str]]]:
+    """macOS: parse `ffmpeg -f avfoundation -list_devices` for video + audio.
+
+    Returns ([(id, name)], [(id, name)]).
+    """
+    if "x" in _AVF_CACHE:
+        return _AVF_CACHE["x"]
+    video: list[tuple[str, str]] = []
+    audio: list[tuple[str, str]] = []
+    if not shutil.which("ffmpeg"):
+        _AVF_CACHE["x"] = (video, audio)
+        return video, audio
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-f", "avfoundation",
+             "-list_devices", "true", "-i", ""],
+            capture_output=True, text=True, timeout=5,
+        )
+        text = (proc.stderr or "") + (proc.stdout or "")
+    except (OSError, subprocess.SubprocessError):
+        text = ""
+    section = None
+    line_re = re.compile(r"\[(\d+)\]\s+(.+)")
+    for line in text.splitlines():
+        if "AVFoundation video devices" in line:
+            section = "video"
+            continue
+        if "AVFoundation audio devices" in line:
+            section = "audio"
+            continue
+        m = line_re.search(line)
+        if m and section:
+            target = video if section == "video" else audio
+            target.append((m.group(1), m.group(2).strip()))
+    _AVF_CACHE["x"] = (video, audio)
+    return video, audio
 
 
 def _query_dshow_devices() -> tuple[list[str], list[str]]:
@@ -132,6 +173,8 @@ class SystemInfo:
         """Return [(id, label)] across platforms."""
         if IS_WINDOWS:
             return [(n, n) for n in _query_dshow_devices()[0]]
+        if IS_MACOS:
+            return list(_query_avfoundation_devices()[0])
         return [(p, p) for p in SystemInfo.list_v4l2_devices()]
 
     # ------- audio sources -------
@@ -147,6 +190,10 @@ class SystemInfo:
         if IS_WINDOWS:
             for n in _query_dshow_devices()[1]:
                 items.append((n, n))
+            return items
+        if IS_MACOS:
+            for dev_id, name in _query_avfoundation_devices()[1]:
+                items.append((dev_id, f"[{dev_id}] {name}"))
             return items
         if shutil.which("pactl"):
             try:

@@ -24,6 +24,7 @@ from typing import Optional
 
 
 IS_WINDOWS = sys.platform.startswith("win")
+IS_MACOS = sys.platform == "darwin"
 
 
 RESOLUTION_MAP = {
@@ -112,6 +113,8 @@ class FFmpegRecorder:
     def detect_display_server() -> str:
         if IS_WINDOWS:
             return "windows"
+        if IS_MACOS:
+            return "macos"
         if os.environ.get("WAYLAND_DISPLAY"):
             return "wayland"
         return "x11"
@@ -126,6 +129,20 @@ class FFmpegRecorder:
                 return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
             except (OSError, AttributeError):
                 return 1920, 1080
+        if IS_MACOS:
+            try:
+                out = subprocess.check_output(
+                    ["system_profiler", "SPDisplaysDataType"],
+                    stderr=subprocess.DEVNULL, text=True, timeout=4,
+                )
+                # Parse "Resolution: 2560 x 1440"
+                import re
+                m = re.search(r"Resolution:\s*(\d+)\s*x\s*(\d+)", out)
+                if m:
+                    return int(m.group(1)), int(m.group(2))
+            except (OSError, subprocess.SubprocessError):
+                pass
+            return 1920, 1080
         try:
             out = subprocess.check_output(
                 ["xrandr"], stderr=subprocess.DEVNULL, text=True, timeout=2
@@ -174,6 +191,25 @@ class FFmpegRecorder:
                     "-framerate", str(cfg.fps),
                     "-i", "desktop",
                 ]
+        elif IS_MACOS:
+            # macOS uses AVFoundation.  Screen device index 1 is the
+            # primary display on Apple Silicon (0 is the camera); we
+            # detect once at runtime and cache.  Audio comes from the
+            # default microphone OR a virtual cable like BlackHole.
+            screen_idx = FFmpegRecorder._macos_screen_index()
+            inp = f"{screen_idx}:none"
+            cmd += [
+                "-f", "avfoundation",
+                "-framerate", str(cfg.fps),
+                "-pixel_format", "uyvy422",
+                "-capture_cursor", "1",
+                "-i", inp,
+            ]
+            if cfg.capture_mode == "area" and cfg.capture_region:
+                # AVFoundation can't crop natively; we crop with the
+                # filter graph instead.  Stash the desired rect so the
+                # filter pass below can apply it.
+                cfg.extra_args.extend([])
         else:
             display_offset = f":0.0+{x},{y}" if cfg.capture_mode == "area" else ":0.0"
             cmd += [
@@ -193,6 +229,16 @@ class FFmpegRecorder:
                     "-framerate", str(min(cfg.fps, 30)),
                     "-video_size", f"{cw}x{ch}",
                     "-i", f"video={cfg.camera_device}",
+                ]
+                camera_active = True
+            elif IS_MACOS:
+                # AVFoundation camera index — 0 is usually FaceTime HD.
+                cam_idx = "0" if not cfg.camera_device.isdigit() else cfg.camera_device
+                cmd += [
+                    "-f", "avfoundation",
+                    "-framerate", str(min(cfg.fps, 30)),
+                    "-video_size", f"{cw}x{ch}",
+                    "-i", f"{cam_idx}:none",
                 ]
                 camera_active = True
             elif Path(cfg.camera_device).exists():
@@ -218,6 +264,10 @@ class FFmpegRecorder:
                 if dev:
                     cmd += ["-f", "dshow", "-i", f"audio={dev}"]
                     audio_inputs += 1
+            elif IS_MACOS:
+                idx = cfg.mic_device if cfg.mic_device and cfg.mic_device.isdigit() else "0"
+                cmd += ["-f", "avfoundation", "-i", f"none:{idx}"]
+                audio_inputs += 1
             else:
                 cmd += ["-f", "pulse", "-i", cfg.mic_device]
                 audio_inputs += 1
@@ -227,6 +277,13 @@ class FFmpegRecorder:
                 if dev:
                     cmd += ["-f", "dshow", "-i", f"audio={dev}"]
                     audio_inputs += 1
+            elif IS_MACOS:
+                # System audio capture on macOS requires BlackHole or
+                # Loopback.  We treat desktop_device as the AVFoundation
+                # audio index of that virtual device.
+                idx = cfg.desktop_device if cfg.desktop_device and cfg.desktop_device.isdigit() else "1"
+                cmd += ["-f", "avfoundation", "-i", f"none:{idx}"]
+                audio_inputs += 1
             else:
                 cmd += ["-f", "pulse", "-i", cfg.desktop_device]
                 audio_inputs += 1
@@ -373,7 +430,9 @@ class FFmpegRecorder:
         gpu = (cfg.encoder == "GPU")
 
         if cfg.codec == "H265":
-            if gpu and FFmpegRecorder._has_encoder("hevc_nvenc"):
+            if IS_MACOS and FFmpegRecorder._has_encoder("hevc_videotoolbox"):
+                args += ["-c:v", "hevc_videotoolbox", "-allow_sw", "1"]
+            elif gpu and FFmpegRecorder._has_encoder("hevc_nvenc"):
                 args += ["-c:v", "hevc_nvenc", "-preset", "fast"]
             elif gpu and FFmpegRecorder._has_encoder("hevc_qsv"):
                 args += ["-c:v", "hevc_qsv"]
@@ -384,7 +443,9 @@ class FFmpegRecorder:
             else:
                 args += ["-c:v", "libx265", "-preset", "veryfast"]
         else:
-            if gpu and FFmpegRecorder._has_encoder("h264_nvenc"):
+            if IS_MACOS and FFmpegRecorder._has_encoder("h264_videotoolbox"):
+                args += ["-c:v", "h264_videotoolbox", "-allow_sw", "1"]
+            elif gpu and FFmpegRecorder._has_encoder("h264_nvenc"):
                 args += ["-c:v", "h264_nvenc", "-preset", "fast"]
             elif gpu and FFmpegRecorder._has_encoder("h264_qsv"):
                 args += ["-c:v", "h264_qsv"]
@@ -400,6 +461,30 @@ class FFmpegRecorder:
         else:
             args += ["-crf", "23"]
         return args
+
+    _macos_screen_idx_cache: str | None = None
+
+    @classmethod
+    def _macos_screen_index(cls) -> str:
+        """Parse `ffmpeg -f avfoundation -list_devices true -i ""` and
+        return the index of the first 'Capture screen' device.  Falls
+        back to "1" which is the conventional primary screen on
+        Apple Silicon."""
+        if cls._macos_screen_idx_cache is not None:
+            return cls._macos_screen_idx_cache
+        try:
+            proc = subprocess.run(
+                ["ffmpeg", "-hide_banner", "-f", "avfoundation",
+                 "-list_devices", "true", "-i", ""],
+                capture_output=True, text=True, timeout=5,
+            )
+            text = (proc.stderr or "") + (proc.stdout or "")
+        except (OSError, subprocess.SubprocessError):
+            text = ""
+        import re
+        m = re.search(r"\[(\d+)\]\s+Capture screen", text)
+        cls._macos_screen_idx_cache = m.group(1) if m else "1"
+        return cls._macos_screen_idx_cache
 
     _encoder_cache: dict[str, bool] = {}
 

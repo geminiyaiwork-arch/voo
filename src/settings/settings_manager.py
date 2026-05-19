@@ -11,10 +11,15 @@ from typing import Any
 IS_WINDOWS = sys.platform.startswith("win")
 
 
+IS_MACOS = sys.platform == "darwin"
+
+
 def _default_videos_dir() -> Path:
     if IS_WINDOWS:
         userprofile = os.environ.get("USERPROFILE") or str(Path.home())
         return Path(userprofile) / "Videos" / "VisioEye"
+    if IS_MACOS:
+        return Path.home() / "Movies" / "VisioEye"
     return Path.home() / "Videos" / "VisioEye"
 
 
@@ -22,6 +27,8 @@ def _default_config_dir() -> Path:
     if IS_WINDOWS:
         appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
         return Path(appdata) / "VisioEye"
+    if IS_MACOS:
+        return Path.home() / "Library" / "Application Support" / "VisioEye"
     return Path.home() / ".config" / "visio-eye"
 
 
