@@ -133,9 +133,12 @@ class MainWindow(QMainWindow):
 
         self.btn_settings = QPushButton(tr("main.btn.settings"))
         self.btn_settings.setObjectName("ghost")
+        self.btn_donate = QPushButton("☕  Donate")
+        self.btn_donate.setObjectName("ghost")
         self.btn_author = QPushButton(tr("main.btn.author"))
         self.btn_author.setObjectName("ghost")
         sb.addWidget(self.btn_settings)
+        sb.addWidget(self.btn_donate)
         sb.addWidget(self.btn_author)
 
         root.addWidget(sidebar)
@@ -318,6 +321,7 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self._stop_recording)
         self.btn_screenshot.clicked.connect(self._take_screenshot)
         self.btn_settings.clicked.connect(self._open_settings)
+        self.btn_donate.clicked.connect(self._open_donate)
         self.btn_author.clicked.connect(self._open_author)
         self.btn_cam_toggle.toggled.connect(self._toggle_camera)
         self.btn_logo_toggle.toggled.connect(self._toggle_logo)
@@ -550,7 +554,32 @@ class MainWindow(QMainWindow):
         if self.recorder.is_recording():
             backend = getattr(self.recorder, "backend", "?")
             self._log(f"Recording started via {backend} backend")
-            # Streaming subprocess status
+
+            # ----- streaming diagnostics -----
+            # Enumerate every target the recorder is actively pushing
+            # to so the user can confirm Telegram + YouTube + Twitch
+            # are all going out in parallel.
+            st = self._settings.get("streaming") or {}
+            targets = st.get("targets") or []
+            active = []
+            for t in targets:
+                if not t.get("enabled"):
+                    continue
+                from streaming import (
+                    StreamTarget, build_rtmp_url, validate_target,
+                )
+                tgt = StreamTarget(
+                    platform=t.get("platform", "custom"),
+                    base_url=t.get("url", ""),
+                    stream_key=t.get("key", ""),
+                    enabled=True,
+                )
+                ok, _ = validate_target(tgt)
+                if ok:
+                    active.append(t.get("platform", "custom"))
+            if active:
+                self._log(f"📡 Live streaming → {', '.join(active)}")
+
             engine = getattr(self.recorder, "_active", None)
             sproc = getattr(engine, "_stream_proc", None)
             slog = getattr(engine, "_stream_log", "")
@@ -769,6 +798,10 @@ class MainWindow(QMainWindow):
 
     def _open_author(self) -> None:
         AuthorDialog(self).exec()
+
+    def _open_donate(self) -> None:
+        from .donate_dialog import DonateDialog
+        DonateDialog(self).exec()
 
     def _change_folder(self) -> None:
         d = QFileDialog.getExistingDirectory(

@@ -34,6 +34,14 @@ installer/windows/ffmpeg/*.exe
 installer/windows/vc_redist.x64.exe
 installer/windows/ffmpeg.zip
 installer/windows/ffmpeg_tmp/
+installer/macos/ffmpeg/ffmpeg
+installer/macos/ffmpeg/ffprobe
+
+# Downloaded artifacts
+VisioEye-Windows-Installer/
+VisioEye-Windows-Portable/
+VisioEye-macOS-DMG/
+VisioEye-macOS-App/
 
 # Logs
 *.log

@@ -128,13 +128,20 @@ class AuthorDialog(QDialog):
         card_layout.addLayout(self._make_row("Email", self.EMAIL))
         root.addWidget(card)
 
-        # close button
+        # close button row
         btn_row = QHBoxLayout()
+        donate_btn = QPushButton("☕  Donate")
+        donate_btn.clicked.connect(self._open_donate)
+        btn_row.addWidget(donate_btn)
         btn_row.addStretch(1)
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
         btn_row.addWidget(close_btn)
         root.addLayout(btn_row)
+
+    def _open_donate(self) -> None:
+        from .donate_dialog import DonateDialog
+        DonateDialog(self).exec()
 
     @staticmethod
     def _make_row(label: str, value: str) -> QHBoxLayout:

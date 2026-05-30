@@ -65,6 +65,10 @@ class SettingsDialog(QDialog):
         author_btn.setObjectName("ghost")
         author_btn.clicked.connect(self._open_author)
         bottom.addWidget(author_btn)
+        donate_btn = QPushButton("☕  Donate")
+        donate_btn.setObjectName("ghost")
+        donate_btn.clicked.connect(self._open_donate)
+        bottom.addWidget(donate_btn)
         bottom.addStretch(1)
 
         cancel_btn = QPushButton(tr("settings.btn.cancel"))
@@ -724,6 +728,10 @@ class SettingsDialog(QDialog):
 
     def _open_author(self) -> None:
         AuthorDialog(self).exec()
+
+    def _open_donate(self) -> None:
+        from .donate_dialog import DonateDialog
+        DonateDialog(self).exec()
 
     # ---------- save ----------
     def _save(self) -> None:

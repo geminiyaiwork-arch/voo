@@ -22,6 +22,9 @@ datas = [
     (str(ASSETS / "img" / "logo.png"),   "assets/img"),
     (str(ASSETS / "img" / "author.png"), "assets/img"),
     (str(ASSETS / "img" / "logo.ico"),   "assets/img"),
+    (str(ASSETS / "icons" / "check_white.svg"), "assets/icons"),
+    (str(ASSETS / "icons" / "usdt.svg"),        "assets/icons"),
+    (str(ASSETS / "icons" / "btc.svg"),         "assets/icons"),
 ]
 # Optional bundled FFmpeg — drop the static build into installer/windows/ffmpeg/
 ffmpeg_dir = PROJECT_DIR / "installer" / "windows" / "ffmpeg"
