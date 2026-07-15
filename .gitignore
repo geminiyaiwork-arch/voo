@@ -50,3 +50,8 @@ KOZGU-macOS-App/
 # Secrets / settings
 settings.json
 *.local
+
+# v/ binaries: they come from GitHub Actions artifacts, not git
+v/*.dmg
+v/*.exe
+v/*.deb
