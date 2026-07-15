@@ -37,6 +37,20 @@ class WhisperASR:
         self._model = None
         self._lock = threading.Lock()
 
+    def preload(self) -> None:
+        """Load the Whisper model eagerly and surface any error to the caller.
+
+        Callers (e.g. DubbingEngine.start) should invoke this from a preflight
+        worker BEFORE audio capture begins, so that a 10-60 s model load does
+        not block the ASR thread while chunks pile up in its queue, and so
+        that load failures are visible instead of being swallowed by the
+        ASR loop's broad except.
+        """
+        self._ensure_model()
+
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
     def _ensure_model(self) -> None:
         if self._model is not None:
             return
@@ -59,13 +73,23 @@ class WhisperASR:
                     compute_type=self.compute_type,
                 )
             except Exception as exc:                # pylint: disable=broad-except
-                # GPU OOM or no CUDA -> fall back to CPU int8.
+                # GPU OOM or no CUDA -> fall back to CPU int8. If the fallback
+                # also fails, propagate so callers (e.g. preload()) can report
+                # the failure to the UI instead of leaving the engine running
+                # with a silently-broken ASR.
                 logger.warning("GPU init failed (%s); falling back to CPU int8", exc)
-                self._model = WhisperModel(
-                    self.model_size if self.model_size != "large-v3" else "medium",
-                    device="cpu",
-                    compute_type="int8",
-                )
+                try:
+                    self._model = WhisperModel(
+                        self.model_size if self.model_size != "large-v3" else "medium",
+                        device="cpu",
+                        compute_type="int8",
+                    )
+                except Exception as cpu_exc:        # pylint: disable=broad-except
+                    logger.error("CPU fallback also failed: %s", cpu_exc)
+                    raise RuntimeError(
+                        f"Whisper model load failed on both GPU ({exc}) "
+                        f"and CPU ({cpu_exc})"
+                    ) from cpu_exc
 
     def transcribe(self, audio: np.ndarray,
                    sample_rate: int = 16000,

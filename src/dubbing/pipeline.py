@@ -50,11 +50,17 @@ class DubbingConfig:
 
 @dataclass
 class DubbingEvent:
-    """Posted to the UI for live transcript display."""
+    """Posted to the UI for live transcript display.
+
+    ``error`` is set (with ``src_text``/``tgt_text`` empty) when the pipeline
+    needs to surface an out-of-band condition — e.g. the capture reader died
+    silently. The UI can render it as a status banner.
+    """
     timestamp: float
     src_lang: str
     src_text: str
     tgt_text: str
+    error: Optional[str] = None
 
 
 class DubbingEngine:
@@ -97,27 +103,39 @@ class DubbingEngine:
         self._router = AudioRouter()
         self.monitor_source = self._router.start()
 
-        self._capture = MonitorCapture(chunk_seconds=cfg.chunk_seconds)
-        self._asr = WhisperASR(
-            model_size=cfg.asr_model,
-            device=cfg.asr_device,
-            compute_type=cfg.asr_compute,
-        )
-        self._tts = EdgeTTS(voice=cfg.voice)
-        self._translator = build_translator(
-            prefer=cfg.translator,
-            yandex_key=cfg.yandex_api_key or None,
-            yandex_folder=cfg.yandex_folder_id or None,
-        )
+        try:
+            self._capture = MonitorCapture(chunk_seconds=cfg.chunk_seconds)
+            self._asr = WhisperASR(
+                model_size=cfg.asr_model,
+                device=cfg.asr_device,
+                compute_type=cfg.asr_compute,
+            )
+            self._tts = EdgeTTS(voice=cfg.voice)
+            self._translator = build_translator(
+                prefer=cfg.translator,
+                yandex_key=cfg.yandex_api_key or None,
+                yandex_folder=cfg.yandex_folder_id or None,
+            )
 
-        self._stop.clear()
-        self._th_asr = threading.Thread(target=self._asr_loop, daemon=True,
-                                         name="dub-asr")
-        self._th_tts = threading.Thread(target=self._tts_loop, daemon=True,
-                                         name="dub-tts")
-        self._th_asr.start()
-        self._th_tts.start()
-        self._capture.start(self._on_audio_chunk)
+            self._stop.clear()
+            self._th_asr = threading.Thread(target=self._asr_loop, daemon=True,
+                                             name="dub-asr")
+            self._th_tts = threading.Thread(target=self._tts_loop, daemon=True,
+                                             name="dub-tts")
+            self._th_asr.start()
+            self._th_tts.start()
+            self._capture.set_error_callback(self._on_capture_error)
+            self._capture.start(self._on_audio_chunk)
+        except Exception:
+            # Tear the router back down so we don't leak the null-sink /
+            # leave the Windows default device swapped out.
+            try:
+                self._router.stop()
+            except Exception:                       # pylint: disable=broad-except
+                logger.exception("AudioRouter cleanup after failed start")
+            self._router = None
+            self.monitor_source = None
+            raise
 
         self.running = True
         logger.info("DubbingEngine running (monitor: %s)", self.monitor_source)
@@ -147,6 +165,25 @@ class DubbingEngine:
         logger.info("DubbingEngine stopped")
 
     # ------- internal -------
+    def _on_capture_error(self, msg: str) -> None:
+        """Called from the capture reader thread when it exits unexpectedly.
+        Surface it to the UI via the normal event channel so the operator
+        sees a 'capture stopped' banner instead of silent no-output."""
+        logger.warning("dubbing capture reported failure: %s", msg)
+        cb = self._event_cb
+        if cb is None:
+            return
+        try:
+            cb(DubbingEvent(
+                timestamp=time.time(),
+                src_lang="",
+                src_text="",
+                tgt_text="",
+                error=msg,
+            ))
+        except Exception:                                  # pylint: disable=broad-except
+            logger.exception("event callback failed while reporting capture error")
+
     def _on_audio_chunk(self, samples: np.ndarray) -> None:
         # Drop oldest if the ASR queue is saturated — better than blocking
         # the capture thread and creating drift.

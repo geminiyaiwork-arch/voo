@@ -205,11 +205,9 @@ class FFmpegRecorder:
                 "-capture_cursor", "1",
                 "-i", inp,
             ]
-            if cfg.capture_mode == "area" and cfg.capture_region:
-                # AVFoundation can't crop natively; we crop with the
-                # filter graph instead.  Stash the desired rect so the
-                # filter pass below can apply it.
-                cfg.extra_args.extend([])
+            # AVFoundation can't crop natively; if the user picked an area
+            # we prepend a crop=w:h:x:y filter in the video chain below.
+            # (Nothing to do here — see filter graph construction.)
         else:
             display_offset = f":0.0+{x},{y}" if cfg.capture_mode == "area" else ":0.0"
             cmd += [
@@ -293,8 +291,13 @@ class FFmpegRecorder:
         filter_parts: list[str] = []
 
         last_video = "0:v"
+        video_prefix = ""
+        if IS_MACOS and cfg.capture_mode == "area" and cfg.capture_region:
+            cx, cy, cw2, ch2 = cfg.capture_region
+            # AVFoundation delivers the whole display; crop first, then scale.
+            video_prefix = f"crop={cw2}:{ch2}:{cx}:{cy},"
         video_chain = (
-            f"[{last_video}]scale={target_w}:{target_h}:"
+            f"[{last_video}]{video_prefix}scale={target_w}:{target_h}:"
             "force_original_aspect_ratio=decrease,"
             f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,"
             "setsar=1[base]"
@@ -378,7 +381,10 @@ class FFmpegRecorder:
         # every 5 seconds so a power loss only loses the unsaved tail.
         # `+empty_moov+default_base_moof+frag_keyframe` is FFmpeg's
         # canonical recipe for streamable / recoverable MP4 files.
-        if (cfg.container or "mp4").lower() in ("mp4", "mov"):
+        # NOTE: when the tee muxer is in play these global options do
+        # NOT propagate into the per-output MP4 sub-muxers; the tee path
+        # therefore re-applies them inline in _tee_output_args().
+        if not cfg.stream_urls and (cfg.container or "mp4").lower() in ("mp4", "mov"):
             cmd += ["-movflags",
                     "+empty_moov+default_base_moof+frag_keyframe",
                     "-frag_duration", "5000000"]    # microseconds
@@ -391,6 +397,19 @@ class FFmpegRecorder:
         return cmd
 
     @staticmethod
+    def _tee_escape(s: str) -> str:
+        """Escape a filename or URL for FFmpeg's tee muxer.
+
+        Tee treats `\\`, `|`, `[`, and `]` as syntax; any occurrence in
+        the payload must be backslash-escaped or the muxer will slice
+        the URL in half (RTMP query strings frequently contain `|`).
+        """
+        return (s.replace("\\", "\\\\")
+                 .replace("|", "\\|")
+                 .replace("[", "\\[")
+                 .replace("]", "\\]"))
+
+    @staticmethod
     def _tee_output_args(cfg: RecordConfig) -> list[str]:
         """Build a `-f tee` clause that writes file + RTMP destinations.
 
@@ -401,16 +420,38 @@ class FFmpegRecorder:
             `cfg.output_path` value.
           * RTMP needs `-f flv` and `onfail=ignore` so a dead destination
             doesn't kill the whole pipeline.
+          * Global `-movflags` are NOT inherited by tee sub-muxers, so
+            fragmented/crash-safe MP4 flags are re-applied inline.
+          * Protocol reconnect options must live inside the sub-output's
+            `[...]` block; otherwise a transient network blip kills the
+            whole broadcast.
         """
         outputs: list[str] = []
         for url in cfg.stream_urls:
             if not url:
                 continue
+            safe_url = FFmpegRecorder._tee_escape(url)
+            # Reconnect + rw_timeout live inside the tee sub-option block
+            # so they attach to *this* RTMP output (per-URL, not global).
             outputs.append(
-                f"[f=flv:onfail=ignore:flvflags=no_duration_filesize]{url}"
+                "[f=flv:onfail=ignore:flvflags=no_duration_filesize"
+                ":reconnect=1:reconnect_streamed=1:reconnect_at_eof=1"
+                ":reconnect_delay_max=5:rw_timeout=5000000"
+                ":listen_timeout=5000000"
+                f"]{safe_url}"
             )
-        container = cfg.container or "mp4"
-        outputs.append(f"[f={container}]{cfg.output_path}")
+        container = (cfg.container or "mp4").lower()
+        safe_path = FFmpegRecorder._tee_escape(cfg.output_path)
+        if container in ("mp4", "mov"):
+            # Inline movflags — see class docstring above for the reason.
+            outputs.append(
+                f"[f={container}"
+                ":movflags=+empty_moov+default_base_moof+frag_keyframe"
+                ":frag_duration=5000000"
+                f"]{safe_path}"
+            )
+        else:
+            outputs.append(f"[f={container}]{safe_path}")
         # The tee output expects a single string.
         tee_string = "|".join(outputs)
         # Force AAC and reasonable streaming GOP.
@@ -428,6 +469,11 @@ class FFmpegRecorder:
         bitrate = BITRATE_MAP.get(cfg.bitrate)
         args: list[str] = []
         gpu = (cfg.encoder == "GPU")
+        # CRF is a libx264/libx265-only knob; hardware encoders (nvenc /
+        # qsv / vaapi / amf / videotoolbox) either ignore it or fail. We
+        # therefore track whether the resolved encoder is a software
+        # x264/x265 build and only emit -crf 23 in that case.
+        is_software = False
 
         if cfg.codec == "H265":
             if IS_MACOS and FFmpegRecorder._has_encoder("hevc_videotoolbox"):
@@ -442,6 +488,7 @@ class FFmpegRecorder:
                 args += ["-c:v", "hevc_vaapi"]
             else:
                 args += ["-c:v", "libx265", "-preset", "veryfast"]
+                is_software = True
         else:
             if IS_MACOS and FFmpegRecorder._has_encoder("h264_videotoolbox"):
                 args += ["-c:v", "h264_videotoolbox", "-allow_sw", "1"]
@@ -455,11 +502,23 @@ class FFmpegRecorder:
                 args += ["-c:v", "h264_vaapi"]
             else:
                 args += ["-c:v", "libx264", "-preset", "veryfast"]
+                is_software = True
 
         if bitrate:
             args += ["-b:v", bitrate, "-maxrate", bitrate, "-bufsize", bitrate]
-        else:
+        elif is_software:
             args += ["-crf", "23"]
+        else:
+            # Auto mode + hardware encoder: derive a sane bitrate from
+            # resolution & frame-rate (6 Mbps @ 1080p30 baseline, scaled
+            # linearly by pixel count and fps, clamped to 1.5-40 Mbps).
+            target_w, target_h = RESOLUTION_MAP.get(cfg.resolution, (1920, 1080))
+            pixels = target_w * target_h
+            fps = max(1, int(cfg.fps or 30))
+            base_bps = 6_000_000 * (pixels / (1920 * 1080)) * (fps / 30.0)
+            kbps = max(1500, min(40_000, int(base_bps / 1000)))
+            br = f"{kbps}k"
+            args += ["-b:v", br, "-maxrate", br, "-bufsize", f"{kbps * 2}k"]
         return args
 
     _macos_screen_idx_cache: str | None = None
@@ -603,13 +662,13 @@ class FFmpegRecorder:
             if self._paused:
                 self.resume()
             # Ask FFmpeg to flush its trailer by sending 'q' on stdin.
+            # We use communicate() rather than write()+wait()+read() so
+            # both stdin and stderr are pumped concurrently — otherwise a
+            # long recording that filled the stderr pipe buffer would
+            # deadlock at wait() waiting for us to drain it.
+            err_bytes = b""
             try:
-                self._proc.stdin.write(b"q")
-                self._proc.stdin.flush()
-            except (OSError, ValueError):
-                pass
-            try:
-                self._proc.wait(timeout=8)
+                _, err_bytes = self._proc.communicate(input=b"q", timeout=8)
             except subprocess.TimeoutExpired:
                 if IS_WINDOWS:
                     try:
@@ -617,18 +676,25 @@ class FFmpegRecorder:
                     except (OSError, ValueError, AttributeError):
                         pass
                 else:
-                    os.killpg(os.getpgid(self._proc.pid), signal.SIGINT)
+                    try:
+                        os.killpg(os.getpgid(self._proc.pid), signal.SIGINT)
+                    except ProcessLookupError:
+                        pass
                 try:
-                    self._proc.wait(timeout=4)
+                    _, err_bytes = self._proc.communicate(timeout=4)
                 except subprocess.TimeoutExpired:
                     if IS_WINDOWS:
                         self._proc.kill()
                     else:
-                        os.killpg(os.getpgid(self._proc.pid), signal.SIGKILL)
-                    self._proc.wait()
-            err = ""
-            if self._proc.stderr:
-                err = self._proc.stderr.read().decode("utf-8", errors="ignore")
+                        try:
+                            os.killpg(os.getpgid(self._proc.pid), signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    try:
+                        _, err_bytes = self._proc.communicate(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        pass
+            err = (err_bytes or b"").decode("utf-8", errors="ignore")
             code = self._proc.returncode or 0
             return code, err
         finally:

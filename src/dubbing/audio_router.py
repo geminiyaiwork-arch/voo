@@ -92,6 +92,16 @@ class AudioRouter:
     # ---------- Linux ----------
     def _start_linux(self) -> str:
         if self._sink_exists():
+            # Sink already exists (e.g. left over from a previous run).
+            # Try to find the module id that owns it so we can unload
+            # exactly that instance on stop. If we can't identify it,
+            # leave _module_id as None so _stop_linux() becomes a no-op
+            # (never blindly unload every module-null-sink).
+            self._module_id = self._find_sink_module_id()
+            logger.info(
+                "PulseAudio sink %s already present (module=%s)",
+                SINK_NAME, self._module_id,
+            )
             return MONITOR_SOURCE
         out = subprocess.check_output([
             "pactl", "load-module", "module-null-sink",
@@ -106,14 +116,10 @@ class AudioRouter:
         return MONITOR_SOURCE
 
     def _stop_linux(self) -> None:
+        # Only unload if we know the exact module index that owns our
+        # sink. Never call `pactl unload-module module-null-sink` — that
+        # would kill null sinks owned by unrelated apps.
         if self._module_id is None:
-            try:
-                subprocess.run(
-                    ["pactl", "unload-module", "module-null-sink"],
-                    capture_output=True, text=True, check=False,
-                )
-            except OSError:
-                pass
             return
         try:
             subprocess.run(["pactl", "unload-module", str(self._module_id)],
@@ -129,6 +135,28 @@ class AudioRouter:
             return SINK_NAME in out
         except (OSError, subprocess.SubprocessError):
             return False
+
+    def _find_sink_module_id(self) -> Optional[int]:
+        """Return the module index of the module-null-sink whose args
+        contain ``sink_name=kozgu-dub``, or None if we can't tell."""
+        try:
+            out = subprocess.check_output(
+                ["pactl", "list", "short", "modules"], text=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        needle = f"sink_name={SINK_NAME}"
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 2 or parts[1] != "module-null-sink":
+                continue
+            args = parts[2] if len(parts) >= 3 else ""
+            if needle in args:
+                try:
+                    return int(parts[0])
+                except ValueError:
+                    return None
+        return None
 
     # ---------- Windows ----------
     def _start_windows(self) -> str:

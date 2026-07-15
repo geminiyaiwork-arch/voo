@@ -19,8 +19,11 @@ class RegionSelector(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setCursor(Qt.CursorShape.CrossCursor)
-        screen = QGuiApplication.primaryScreen().geometry()
-        self.setGeometry(screen)
+        geom = QRect()
+        for s in QGuiApplication.screens():
+            geom = geom.united(s.geometry())
+        self._virtual_geom = geom
+        self.setGeometry(geom)
         self._start: QPoint | None = None
         self._end: QPoint | None = None
 
@@ -43,7 +46,8 @@ class RegionSelector(QWidget):
         if self._start and self._end:
             rect = QRect(self._start, self._end).normalized()
             if rect.width() > 8 and rect.height() > 8:
-                self.region_selected.emit(rect.x(), rect.y(),
+                self.region_selected.emit(rect.x() + self._virtual_geom.x(),
+                                           rect.y() + self._virtual_geom.y(),
                                            rect.width(), rect.height())
             else:
                 self.cancelled.emit()

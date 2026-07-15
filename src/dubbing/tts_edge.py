@@ -44,16 +44,30 @@ class EdgeTTS:
         self.rate = rate
         self.volume = volume
 
-    async def _synth_async(self, text: str) -> bytes:
+    async def _synth_async(self, text: str, timeout: float = 20.0) -> bytes:
         import edge_tts
         if not text.strip():
             return b""
         com = edge_tts.Communicate(text, self.voice,
                                     rate=self.rate, volume=self.volume)
         buf = io.BytesIO()
-        async for chunk in com.stream():
-            if chunk["type"] == "audio":
-                buf.write(chunk["data"])
+
+        async def _drain() -> None:
+            async for chunk in com.stream():
+                if chunk["type"] == "audio":
+                    buf.write(chunk["data"])
+
+        task = asyncio.ensure_future(_drain())
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+        except asyncio.TimeoutError:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+            logger.warning("edge-tts synth timed out after %.1fs; cancelled", timeout)
+            return b""
         return buf.getvalue()
 
     def synth(self, text: str) -> bytes:
@@ -73,7 +87,8 @@ class EdgeTTS:
                     loop.close()
             t = threading.Thread(target=_runner, daemon=True)
             t.start()
-            t.join(timeout=20)
+            # give the async-side timeout (20s) headroom to cancel cleanly
+            t.join(timeout=25)
             return result.get("b", b"")
 
     @staticmethod

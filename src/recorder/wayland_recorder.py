@@ -71,32 +71,39 @@ class WaylandPortalRecorder:
             return False, "gst-launch-1.0 not installed (install gstreamer1.0-tools)"
         return True, ""
 
-    _gpu_enc_cache: str | None = None
+    _gpu_enc_cache: dict[str, str] = {}
 
     @classmethod
-    def _detect_gpu_encoder(cls) -> str:
-        """Return the name of the fastest available GST encoder.
+    def _detect_gpu_encoder(cls, codec: str = "H264") -> str:
+        """Return the name of the fastest available GST encoder for `codec`.
 
-        We probe with gst-inspect-1.0 once and cache.  Order of
-        preference: VAAPI (Intel/AMD) > QSV (Intel) > NVENC (NVIDIA)
-        > x264 (CPU fallback).  VAAPI runs anywhere with `intel-
-        media-va-driver` + `gstreamer1.0-vaapi`, NVENC requires the
-        proprietary NVIDIA build of gst-plugins-bad.
+        We probe with gst-inspect-1.0 once per codec and cache the
+        result on the class.  Order of preference: VAAPI (Intel/AMD)
+        > QSV (Intel) > NVENC (NVIDIA) > x264/x265 (CPU fallback).
+        VAAPI runs anywhere with `intel-media-va-driver` +
+        `gstreamer1.0-vaapi`; NVENC requires the proprietary NVIDIA
+        build of gst-plugins-bad.
         """
-        if cls._gpu_enc_cache is not None:
-            return cls._gpu_enc_cache
-        for cand in ("vah264enc", "vaapih264enc", "qsvh264enc",
-                      "nvcudah264enc", "nvh264enc"):
+        key = "H265" if str(codec).upper() == "H265" else "H264"
+        if key in cls._gpu_enc_cache:
+            return cls._gpu_enc_cache[key]
+        if key == "H265":
+            candidates = ("vah265enc", "vaapih265enc", "qsvh265enc",
+                          "nvcudah265enc", "nvh265enc")
+        else:
+            candidates = ("vah264enc", "vaapih264enc", "qsvh264enc",
+                          "nvcudah264enc", "nvh264enc")
+        for cand in candidates:
             try:
                 subprocess.check_output(
                     ["gst-inspect-1.0", cand],
                     stderr=subprocess.DEVNULL, timeout=2,
                 )
-                cls._gpu_enc_cache = cand
+                cls._gpu_enc_cache[key] = cand
                 return cand
             except (OSError, subprocess.SubprocessError):
                 continue
-        cls._gpu_enc_cache = ""
+        cls._gpu_enc_cache[key] = ""
         return ""
 
     @staticmethod
@@ -213,6 +220,7 @@ class WaylandPortalRecorder:
                         mic_device: str, desktop_device: str,
                         stream_urls: list[str] | None = None,
                         stream_bitrate_kbps: int = 4500,
+                        record_bitrate_kbps: int = 8000,
                         stream_keyint_sec: int = 2,
                         stream_audio_kbps: int = 160,
                         capture_region: tuple[int, int, int, int] | None = None,
@@ -234,69 +242,91 @@ class WaylandPortalRecorder:
         # (an OS pipe to the FFmpeg relay) so the *exact same* portal
         # video source is teed to both the file recorder and the
         # streamer.  No XWayland blackouts.
-        _ = stream_keyint_sec
-        _ = stream_audio_kbps
-        _ = stream_bitrate_kbps
         streaming = bool(stream_urls)
 
+        # When streaming, size the encoder for the RTMP link; otherwise
+        # honour the user's recording bitrate preset (Low/Medium/High/
+        # Ultra/Auto).  Keyframe interval derives from stream_keyint_sec.
+        enc_bitrate = stream_bitrate_kbps if streaming else record_bitrate_kbps
+        keyint = max(1, int(fps) * max(1, int(stream_keyint_sec)))
+
         # ---- encoder ----
-        # Detect GPU encoders at module import time (cached on class).
-        gpu_enc = WaylandPortalRecorder._detect_gpu_encoder()
+        # Detect the fastest available GPU encoder for this codec
+        # (cached on class per codec family).
+        gpu_enc = WaylandPortalRecorder._detect_gpu_encoder(codec)
         if codec == "H265":
             if gpu_enc == "vaapih265enc":
                 v_enc = [
                     "vaapih265enc",
-                    f"bitrate={stream_bitrate_kbps}",
-                    f"keyframe-period={fps * 2}",
-                    "!", "h265parse",
+                    f"bitrate={enc_bitrate}",
+                    f"keyframe-period={keyint}",
+                    "!", "h265parse", "config-interval=-1",
                 ]
-            elif gpu_enc == "nvh265enc":
+            elif gpu_enc == "vah265enc":
                 v_enc = [
-                    "nvh265enc", "preset=low-latency-hq",
-                    f"bitrate={stream_bitrate_kbps}",
-                    "!", "h265parse",
+                    "vah265enc", "target-usage=4",
+                    f"bitrate={enc_bitrate}",
+                    f"key-int-max={keyint}",
+                    "!", "h265parse", "config-interval=-1",
+                ]
+            elif gpu_enc == "qsvh265enc":
+                v_enc = [
+                    "qsvh265enc",
+                    f"bitrate={enc_bitrate}",
+                    f"gop-size={keyint}",
+                    "!", "h265parse", "config-interval=-1",
+                ]
+            elif gpu_enc in ("nvh265enc", "nvcudah265enc"):
+                v_enc = [
+                    gpu_enc, "preset=low-latency-hq",
+                    f"bitrate={enc_bitrate}",
+                    f"gop-size={keyint}",
+                    "!", "h265parse", "config-interval=-1",
                 ]
             else:
                 v_enc = [
                     "x265enc", "tune=zerolatency", "speed-preset=superfast",
-                    f"bitrate={stream_bitrate_kbps}",
-                    "!", "h265parse",
+                    f"bitrate={enc_bitrate}",
+                    f"key-int-max={keyint}",
+                    "!", "h265parse", "config-interval=-1",
                 ]
         else:
             if gpu_enc == "vaapih264enc":
                 v_enc = [
                     "vaapih264enc",
-                    f"bitrate={stream_bitrate_kbps}",
-                    f"keyframe-period={fps * 2}",
-                    "!", "h264parse",
+                    f"bitrate={enc_bitrate}",
+                    f"keyframe-period={keyint}",
+                    "!", "h264parse", "config-interval=-1",
                 ]
             elif gpu_enc == "vah264enc":
                 v_enc = [
                     "vah264enc", "target-usage=4",
-                    f"bitrate={stream_bitrate_kbps}",
-                    "!", "h264parse",
+                    f"bitrate={enc_bitrate}",
+                    f"key-int-max={keyint}",
+                    "!", "h264parse", "config-interval=-1",
                 ]
             elif gpu_enc == "qsvh264enc":
                 v_enc = [
                     "qsvh264enc",
-                    f"bitrate={stream_bitrate_kbps}",
-                    "!", "h264parse",
+                    f"bitrate={enc_bitrate}",
+                    f"gop-size={keyint}",
+                    "!", "h264parse", "config-interval=-1",
                 ]
-            elif gpu_enc == "nvh264enc":
+            elif gpu_enc in ("nvh264enc", "nvcudah264enc"):
                 v_enc = [
-                    "nvh264enc", "preset=low-latency-hq",
-                    f"bitrate={stream_bitrate_kbps}",
-                    "!", "h264parse",
+                    gpu_enc, "preset=low-latency-hq",
+                    f"bitrate={enc_bitrate}",
+                    f"gop-size={keyint}",
+                    "!", "h264parse", "config-interval=-1",
                 ]
             else:
                 # Software fallback — superfast trades quality for speed.
-                # 1-sec GOP (key-int-max=fps) cuts the time-to-first-frame
-                # at the RTMP server by ~1 sec.  bframes=0 + zerolatency
-                # removes the encoder lookahead delay.
+                # bframes=0 + zerolatency removes the encoder lookahead
+                # delay so time-to-first-frame at the RTMP server is minimal.
                 v_enc = [
                     "x264enc", "tune=zerolatency", "speed-preset=superfast",
-                    f"bitrate={stream_bitrate_kbps}",
-                    f"key-int-max={fps}", "bframes=0",
+                    f"bitrate={enc_bitrate}",
+                    f"key-int-max={keyint}", "bframes=0",
                     "rc-lookahead=0", "sliced-threads=true",
                     "threads=0",
                     "!", "h264parse", "config-interval=-1",
@@ -388,19 +418,28 @@ class WaylandPortalRecorder:
             audio_branch += [
                 "!", "audioconvert",
                 "!", "audioresample",
-                "!", "queue", "max-size-buffers=8", "max-size-time=0",
-            "max-size-bytes=0", "leaky=downstream",
-                "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
-                "!", "aacparse",
             ]
             if streaming:
+                # Tee the raw PCM so the file muxer gets `audio_kbps`
+                # and the RTMP leg is re-encoded at `stream_audio_kbps`.
                 audio_branch += [
-                    "!", "tee", "name=atee",
-                    "atee.", "!", "queue", "!", "mux.",
-                    "atee.", "!", "queue", "!", "smux.",
+                    "!", "tee", "name=araw",
+                    "araw.", "!", "queue", "max-size-buffers=8",
+                    "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
+                    "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
+                    "!", "aacparse", "!", "queue", "!", "mux.",
+                    "araw.", "!", "queue", "max-size-buffers=8",
+                    "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
+                    "!", "voaacenc", f"bitrate={stream_audio_kbps * 1000}",
+                    "!", "aacparse", "!", "queue", "!", "smux.",
                 ]
             else:
-                audio_branch += ["!", "queue", "!", "mux."]
+                audio_branch += [
+                    "!", "queue", "max-size-buffers=8", "max-size-time=0",
+                    "max-size-bytes=0", "leaky=downstream",
+                    "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
+                    "!", "aacparse", "!", "queue", "!", "mux.",
+                ]
             parts += audio_branch
 
         return parts
@@ -429,12 +468,46 @@ class WaylandPortalRecorder:
             capture_region = tuple(cfg.capture_region)        # type: ignore[arg-type]
 
         # Resolve target width/height from the user's video setting.
-        from .ffmpeg_handler import RESOLUTION_MAP
+        from .ffmpeg_handler import RESOLUTION_MAP, BITRATE_MAP
         tw, th = RESOLUTION_MAP.get(cfg.resolution, (1920, 1080))
         # Pick the streaming bitrate that matches the chosen quality
         # when the user hasn't customised it (8 Mbps for 1080p felt
         # heavy under software encode).
         stream_br = int(getattr(cfg, "stream_bitrate_kbps", 4500) or 4500)
+        # Resolve the recording bitrate from cfg.bitrate (Low/Medium/
+        # High/Ultra/Auto) — used when not streaming.
+        record_br = self._resolve_record_bitrate(
+            BITRATE_MAP.get(getattr(cfg, "bitrate", "Auto")),
+            tw, th, cfg.fps,
+        )
+
+        # ---------- streaming bridge wiring ----------
+        # Create an OS pipe so that GStreamer's flvmux output (via fdsink)
+        # feeds straight into FFmpeg's stdin.  No XWayland, no x11grab —
+        # the exact same portal-granted frames go to BOTH outputs.
+        #
+        # IMPORTANT: we spawn the FFmpeg relay BEFORE gst-launch so that
+        # a launch failure can be recovered by rebuilding the gst
+        # pipeline without the streaming tee.  Otherwise gst would keep
+        # a live fdsink pointed at a closed pipe and die on SIGPIPE.
+        stream_read_fd = -1
+        stream_write_fd = -1
+        if stream_urls:
+            stream_read_fd, stream_write_fd = os.pipe()
+            started = self._start_streaming_bridge(
+                stream_urls=stream_urls,
+                input_fd=stream_read_fd,
+                audio_source=cfg.audio_source,
+            )
+            if not started:
+                # FFmpeg failed to launch: drop the streaming leg so
+                # gst never writes into a dead pipe.
+                try:
+                    os.close(stream_write_fd)
+                except OSError:
+                    pass
+                stream_write_fd = -1
+                stream_urls = []
 
         pipeline = self._build_pipeline(
             node_id=node_id,
@@ -448,6 +521,7 @@ class WaylandPortalRecorder:
             desktop_device=cfg.desktop_device,
             stream_urls=stream_urls,
             stream_bitrate_kbps=stream_br,
+            record_bitrate_kbps=record_br,
             stream_keyint_sec=int(getattr(cfg, "stream_keyint_sec", 2)),
             stream_audio_kbps=int(getattr(cfg, "stream_audio_kbps", 160)),
             capture_region=capture_region,
@@ -458,15 +532,6 @@ class WaylandPortalRecorder:
 
         env = os.environ.copy()
         env["PIPEWIRE_REMOTE"] = "1"
-
-        # ---------- streaming bridge wiring ----------
-        # Create an OS pipe so that GStreamer's flvmux output (via fdsink)
-        # feeds straight into FFmpeg's stdin.  No XWayland, no x11grab —
-        # the exact same portal-granted frames go to BOTH outputs.
-        stream_read_fd = -1
-        stream_write_fd = -1
-        if stream_urls:
-            stream_read_fd, stream_write_fd = os.pipe()
 
         # Substitute the placeholder for the streaming FD.
         if stream_write_fd >= 0:
@@ -497,16 +562,18 @@ class WaylandPortalRecorder:
             pass_fds=tuple(pass_fds),
             close_fds=True,
         )
-        # Close our copy of the write end — gst owns it now.
+        # Close our copies of the fds we handed to the child — gst owns
+        # them now.  Not closing pipewire_fd here leaks one socket per
+        # recording session.
+        try:
+            os.close(pipewire_fd)
+        except OSError:
+            pass
         if stream_write_fd >= 0:
-            os.close(stream_write_fd)
-
-        # ---------- spawn FFmpeg relay ----------
-        if stream_urls and stream_read_fd >= 0:
-            self._start_streaming_bridge(
-                stream_urls=stream_urls,
-                input_fd=stream_read_fd,
-            )
+            try:
+                os.close(stream_write_fd)
+            except OSError:
+                pass
 
     # ---------- streaming bridge ----------
     @staticmethod
@@ -516,8 +583,50 @@ class WaylandPortalRecorder:
         out.mkdir(parents=True, exist_ok=True)
         return out / "stream.log"
 
+    @staticmethod
+    def _resolve_record_bitrate(preset: str | None,
+                                 width: int, height: int, fps: int) -> int:
+        """Return recording bitrate in kbps.
+
+        `preset` is a `BITRATE_MAP` value like `'2M'` or `'10M'`, or
+        `None` meaning "Auto" — pick a sensible default from the
+        target resolution and frame rate.
+        """
+        if preset:
+            unit = preset[-1].upper()
+            try:
+                num = int(preset[:-1])
+            except ValueError:
+                try:
+                    return int(preset)
+                except ValueError:
+                    return 5000
+            if unit == "M":
+                return num * 1000
+            if unit == "K":
+                return num
+            try:
+                return int(preset)
+            except ValueError:
+                return 5000
+        pixels = max(1, int(width)) * max(1, int(height))
+        if pixels >= 3840 * 2160:
+            base = 40000
+        elif pixels >= 2560 * 1440:
+            base = 20000
+        elif pixels >= 1920 * 1080:
+            base = 8000
+        elif pixels >= 1280 * 720:
+            base = 4500
+        else:
+            base = 2500
+        if int(fps) >= 60:
+            base = int(base * 1.5)
+        return base
+
     def _start_streaming_bridge(self, stream_urls: list[str],
-                                 input_fd: int) -> None:
+                                 input_fd: int,
+                                 audio_source: str = "both") -> bool:
         """Spawn an FFmpeg subprocess that reads the GStreamer FLV
         stream from a pipe FD and forwards it to every RTMP/RTMPS
         destination via the tee muxer (one re-mux, many outputs).
@@ -526,7 +635,12 @@ class WaylandPortalRecorder:
         This means streaming adds <2% CPU on top of recording, and the
         source frames are *identical* to what the file gets — solving
         the Wayland/XWayland black-screen problem entirely.
+
+        Returns True on successful spawn, False on failure (caller is
+        responsible for tearing the streaming leg out of the pipeline
+        so gst never writes into a dead pipe).
         """
+        has_audio = audio_source in ("mic", "both", "desktop")
         if len(stream_urls) == 1:
             # Direct push, simpler and lighter than tee.
             cmd = [
@@ -552,7 +666,13 @@ class WaylandPortalRecorder:
                 "-probesize", "32",
                 "-analyzeduration", "0",
                 "-f", "flv", "-i", "pipe:0",
-                "-map", "0:v:0", "-map", "0:a:0",
+                "-map", "0:v:0",
+            ]
+            if has_audio:
+                # `?` optional-stream form protects tee if the audio
+                # branch of the FLV never materialises for any reason.
+                cmd += ["-map", "0:a:0?"]
+            cmd += [
                 "-c", "copy",
                 "-flush_packets", "1",
                 "-flags", "+global_header",
@@ -574,6 +694,7 @@ class WaylandPortalRecorder:
             # We've passed the fd to the child; close ours.
             os.close(input_fd)
             self._stream_log = str(log_path)
+            return True
         except OSError as exc:
             self._stream_proc = None
             self._stream_log = f"FFmpeg failed to launch: {exc}"
@@ -581,22 +702,40 @@ class WaylandPortalRecorder:
                 os.close(input_fd)
             except OSError:
                 pass
+            return False
 
     def pause(self) -> None:
         if self._proc and not self._paused:
+            # Freeze both gst-launch AND the FFmpeg streaming relay so
+            # the RTMP server doesn't see writes stop while the file
+            # capture is frozen — otherwise the RTMP link disconnects.
             try:
                 os.killpg(os.getpgid(self._proc.pid), signal.SIGSTOP)
-                self._paused = True
             except ProcessLookupError:
                 pass
+            if self._stream_proc is not None:
+                try:
+                    os.killpg(os.getpgid(self._stream_proc.pid),
+                              signal.SIGSTOP)
+                except ProcessLookupError:
+                    pass
+            self._paused = True
 
     def resume(self) -> None:
         if self._proc and self._paused:
+            # Wake the streaming relay first so it can drain any
+            # buffered frames as soon as gst starts producing again.
+            if self._stream_proc is not None:
+                try:
+                    os.killpg(os.getpgid(self._stream_proc.pid),
+                              signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
             try:
                 os.killpg(os.getpgid(self._proc.pid), signal.SIGCONT)
-                self._paused = False
             except ProcessLookupError:
                 pass
+            self._paused = False
 
     def stop(self) -> tuple[int, str]:
         if not self._proc:

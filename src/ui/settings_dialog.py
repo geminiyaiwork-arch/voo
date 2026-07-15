@@ -19,6 +19,26 @@ from settings import SettingsManager
 from utils.system_info import SystemInfo
 from .author_dialog import AuthorDialog
 
+# Module-level anchor so streaming-probe QThreads outlive any Settings
+# dialog that spawned them.  The dialog holds a per-instance list so it
+# can disconnect signals in closeEvent when it is being torn down.
+_ACTIVE_TEST_WORKERS: set = set()
+
+
+def _widget_alive(obj) -> bool:
+    """True iff *obj* is a live (non-deleted) Qt object."""
+    if obj is None:
+        return False
+    try:
+        from shiboken6 import isValid  # type: ignore
+        return bool(isValid(obj))
+    except Exception:
+        try:
+            from PyQt6 import sip  # type: ignore
+            return not sip.isdeleted(obj)
+        except Exception:
+            return True
+
 
 class SettingsDialog(QDialog):
     settings_changed = pyqtSignal()
@@ -609,8 +629,14 @@ class SettingsDialog(QDialog):
                 self.done.emit(ok, msg)
 
         def _on_done(ok: bool, msg: str) -> None:
-            btn.setEnabled(True)
-            btn.setText(old_text)
+            # The dialog may have been closed / the button removed
+            # while the probe was still running.  Guard every Qt
+            # widget deref before touching it.
+            if _widget_alive(btn):
+                btn.setEnabled(True)
+                btn.setText(old_text)
+            if not _widget_alive(self):
+                return
             if ok:
                 QMessageBox.information(self, "Test stream",
                                           f"✓ {msg}\n\n{url}")
@@ -618,15 +644,39 @@ class SettingsDialog(QDialog):
                 QMessageBox.warning(self, "Test stream",
                                      f"✗ {msg}\n\n{url}")
 
-        worker = _Worker(self)
+        # Do NOT parent the QThread to `self` — the dialog can be
+        # destroyed before the probe finishes, which would delete the
+        # thread mid-run.  Anchor it in a module-level set instead.
+        worker = _Worker()
         worker.done.connect(_on_done)
-        # Keep a ref so the QThread isn't GC'd before it finishes.
         if not hasattr(self, "_test_workers"):
             self._test_workers: list = []
         self._test_workers.append(worker)
-        worker.finished.connect(lambda w=worker: self._test_workers.remove(w)
-                                  if w in self._test_workers else None)
+        _ACTIVE_TEST_WORKERS.add(worker)
+
+        def _cleanup(w=worker) -> None:
+            _ACTIVE_TEST_WORKERS.discard(w)
+            if hasattr(self, "_test_workers") and w in self._test_workers:
+                try:
+                    self._test_workers.remove(w)
+                except ValueError:
+                    pass
+            w.deleteLater()
+
+        worker.finished.connect(_cleanup)
         worker.start()
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        """Disconnect any in-flight streaming-probe callbacks so they
+        don't fire against widgets that are about to be destroyed.
+        The worker threads themselves stay alive (anchored in
+        ``_ACTIVE_TEST_WORKERS``) and clean up when they finish."""
+        for worker in list(getattr(self, "_test_workers", [])):
+            try:
+                worker.done.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+        super().closeEvent(event)
 
     # ---------- HTML overlay ----------
     def _build_html(self) -> QWidget:

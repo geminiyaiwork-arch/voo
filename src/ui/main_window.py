@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
 
         self.btn_settings = QPushButton(tr("main.btn.settings"))
         self.btn_settings.setObjectName("ghost")
-        self.btn_donate = QPushButton("☕  Donate")
+        self.btn_donate = QPushButton(tr("main.btn.donate"))
         self.btn_donate.setObjectName("ghost")
         self.btn_author = QPushButton(tr("main.btn.author"))
         self.btn_author.setObjectName("ghost")
@@ -514,17 +514,19 @@ class MainWindow(QMainWindow):
             # Pre-download the Whisper model with a progress dialog
             # so the first launch doesn't look frozen for ~1 minute.
             if not self._ensure_whisper_model(dub_cfg):
-                self._log("Dublyator bekor qilindi — model yuklanmadi")
+                self._log(tr("main.log.dubber_off"))
             else:
                 try:
                     self.dub_monitor_source = self._start_dubbing(dub_cfg)
-                    self._log("Dublyator yoqildi")
+                    self._log(tr("main.log.dubber_on"))
                     settings_snapshot.setdefault("audio", {})
                     settings_snapshot["audio"]["source"] = "desktop"
                     settings_snapshot["audio"]["desktop_device"] = self.dub_monitor_source
                 except (OSError, RuntimeError) as e:
-                    QMessageBox.warning(self, "Dubbing failed to start", str(e))
-                    self._log(f"Dublyator yoqilmadi: {e}")
+                    QMessageBox.warning(
+                        self, tr("main.dialog.dubbing_failed"), str(e)
+                    )
+                    self._log(tr("main.log.dubber_fail").format(err=e))
                     self.dub_monitor_source = None
 
         try:
@@ -546,14 +548,14 @@ class MainWindow(QMainWindow):
         self._blink_timer = QTimer(self)
         self._blink_timer.timeout.connect(self._blink)
         self._blink_timer.start(600)
-        self._log(f"Recording → {out}")
-        self.statusBar().showMessage(f"Recording → {out}")
+        self._log(tr("main.log.recording_to").format(path=out))
+        self.statusBar().showMessage(tr("main.log.recording_to").format(path=out))
 
     def _verify_recording_alive(self) -> None:
         """Called 1.5s after start. If backend died, surface the stderr."""
         if self.recorder.is_recording():
             backend = getattr(self.recorder, "backend", "?")
-            self._log(f"Recording started via {backend} backend")
+            self._log(tr("main.log.recording_started").format(backend=backend))
 
             # ----- streaming diagnostics -----
             # Enumerate every target the recorder is actively pushing
@@ -727,7 +729,7 @@ class MainWindow(QMainWindow):
             self.recorder.resume()
             self.btn_pause.setText("⏸  Pause")
             self.lbl_status[1].setText(tr("main.status.recording"))
-            self._log("Resumed")
+            self._log(tr("main.log.resumed"))
         else:
             self.recorder.pause()
             self.btn_pause.setText("▶  Resume")
