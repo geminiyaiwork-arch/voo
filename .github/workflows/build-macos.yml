@@ -34,12 +34,8 @@ jobs:
 
       - name: Download FFmpeg static builds
         run: |
-          mkdir -p installer/macos/ffmpeg
-          curl -fsSL -o /tmp/ffmpeg.zip  https://evermeet.cx/ffmpeg/getrelease/zip
-          curl -fsSL -o /tmp/ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
-          unzip -o /tmp/ffmpeg.zip  -d installer/macos/ffmpeg/
-          unzip -o /tmp/ffprobe.zip -d installer/macos/ffmpeg/
-          chmod +x installer/macos/ffmpeg/ffmpeg installer/macos/ffmpeg/ffprobe
+          # FFmpeg is no longer bundled — fetched on first launch.
+          echo "Skipping FFmpeg download (ships lazily)."
 
       - name: Run PyInstaller
         env:

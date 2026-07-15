@@ -26,12 +26,9 @@ datas = [
     (str(ASSETS / "icons" / "usdt.svg"),        "assets/icons"),
     (str(ASSETS / "icons" / "btc.svg"),         "assets/icons"),
 ]
-# Optional bundled FFmpeg — drop the static build into installer/windows/ffmpeg/
-ffmpeg_dir = PROJECT_DIR / "installer" / "windows" / "ffmpeg"
-if (ffmpeg_dir / "ffmpeg.exe").exists():
-    datas.append((str(ffmpeg_dir / "ffmpeg.exe"), "ffmpeg"))
-    if (ffmpeg_dir / "ffprobe.exe").exists():
-        datas.append((str(ffmpeg_dir / "ffprobe.exe"), "ffmpeg"))
+# FFmpeg is intentionally NOT bundled — it adds ~140 MB and the app
+# now auto-downloads a static build on first launch via ffmpeg_bootstrap.
+# This keeps the installer under the UCMS upload limit.
 
 a = Analysis(
     [str(SRC / "main.py")],

@@ -439,13 +439,9 @@ class MainWindow(QMainWindow):
 
     # ---------- recording ----------
     def _start_recording(self) -> None:
-        from recorder.ffmpeg_handler import FFmpegRecorder
-        if not FFmpegRecorder.ffmpeg_available():
-            QMessageBox.critical(
-                self, "FFmpeg missing",
-                "FFmpeg is not installed.\n\nInstall it with:\n"
-                "    sudo apt install ffmpeg"
-            )
+        # First-launch FFmpeg bootstrap (Windows/macOS only — Linux
+        # gets it via apt from the .deb dependency chain).
+        if not self._ensure_ffmpeg_ready():
             return
         if self.recorder.is_recording():
             return
@@ -462,6 +458,78 @@ class MainWindow(QMainWindow):
 
         self._save_inline("video", "capture_mode", mode)
         self._launch_recording(region)
+
+    def _ensure_ffmpeg_ready(self) -> bool:
+        """If FFmpeg is missing, offer to download it in-app.  Blocking
+        dialog with a progress bar; returns True when FFmpeg is usable."""
+        import sys as _sys
+        from utils import ffmpeg_available, ensure_ffmpeg
+        if ffmpeg_available():
+            return True
+
+        if _sys.platform.startswith("linux"):
+            QMessageBox.critical(
+                self, "FFmpeg missing",
+                "FFmpeg is not installed.\n\nInstall it with:\n"
+                "    sudo apt install ffmpeg"
+            )
+            return False
+
+        reply = QMessageBox.question(
+            self, "Download FFmpeg?",
+            "KO'ZGU needs FFmpeg to record and stream.  It's ~80 MB "
+            "and will be downloaded once and cached.  Continue?",
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return False
+
+        from PyQt6.QtWidgets import QProgressDialog
+        from PyQt6.QtCore import QEventLoop
+        dlg = QProgressDialog("Downloading FFmpeg…", "Cancel", 0, 100, self)
+        dlg.setWindowTitle("KO'ZGU — FFmpeg")
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(True)
+        dlg.setAutoReset(False)
+        dlg.show()
+
+        state = {"done": False, "path": None, "abort": False}
+
+        def _progress(frac: float) -> None:
+            QTimer.singleShot(0, lambda f=frac: dlg.setValue(int(f * 100)))
+
+        import threading
+        def _worker() -> None:
+            state["path"] = ensure_ffmpeg(_progress)
+            state["done"] = True
+            QTimer.singleShot(0, dlg.close)
+        threading.Thread(target=_worker, daemon=True,
+                          name="ffmpeg-dl").start()
+
+        loop = QEventLoop()
+        timer = QTimer(self)
+        def _tick() -> None:
+            if state["done"] or dlg.wasCanceled():
+                if dlg.wasCanceled():
+                    state["abort"] = True
+                loop.quit()
+        timer.timeout.connect(_tick)
+        timer.start(150)
+        loop.exec()
+        timer.stop()
+
+        if state["path"]:
+            # Add ffmpeg dir to PATH for FFmpegRecorder subprocess lookups
+            import os as _os
+            from utils import ffmpeg_dir
+            _os.environ["PATH"] = str(ffmpeg_dir()) + _os.pathsep + _os.environ.get("PATH", "")
+            return True
+
+        QMessageBox.warning(
+            self, "FFmpeg",
+            "FFmpeg download did not complete.  Try again or install "
+            "FFmpeg manually from https://ffmpeg.org/download.html"
+        )
+        return False
 
     def _begin_area_selection(self) -> None:
         self.hide()

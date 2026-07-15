@@ -23,13 +23,8 @@ datas = [
     (str(ASSETS / "icons" / "usdt.svg"),        "assets/icons"),
     (str(ASSETS / "icons" / "btc.svg"),         "assets/icons"),
 ]
-# Optional bundled FFmpeg.  build_macos.sh fetches a static build
-# from evermeet.cx if installer/macos/ffmpeg/ffmpeg is absent.
-ffmpeg_dir = PROJECT_DIR / "installer" / "macos" / "ffmpeg"
-if (ffmpeg_dir / "ffmpeg").exists():
-    datas.append((str(ffmpeg_dir / "ffmpeg"), "ffmpeg"))
-    if (ffmpeg_dir / "ffprobe").exists():
-        datas.append((str(ffmpeg_dir / "ffprobe"), "ffmpeg"))
+# FFmpeg is NOT bundled — auto-downloaded on first launch via
+# ffmpeg_bootstrap.  Keeps the .app bundle small enough for UCMS.
 
 a = Analysis(
     [str(SRC / "main.py")],

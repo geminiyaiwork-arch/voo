@@ -53,9 +53,10 @@ Name: "quicklaunchicon"; Description: "Create a &Quick Launch icon"; \
 ; PyInstaller produces a folder dist\kozgu\ — copy the entire tree.
 Source: "..\..\dist\kozgu\*"; DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
-; FFmpeg + ffprobe — bundled by build_windows.bat from gyan.dev.
-Source: "ffmpeg\ffmpeg.exe"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "ffmpeg\ffprobe.exe"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion skipifsourcedoesntexist
+; FFmpeg is NOT bundled anymore — the app downloads a static build on
+; first launch and caches it in %APPDATA%\KOZGU\ffmpeg\.  This keeps
+; the installer small enough to upload through UCMS.UZ (nginx client
+; max body size).
 ; Visual C++ 2015-2022 Redistributable (x64) — also bundled by
 ; build_windows.bat so the installer works on offline machines.
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; \
@@ -81,13 +82,6 @@ Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; \
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; \
     Filename: "{app}\{#MyAppExeName}"; \
     IconFilename: "{app}\assets\img\logo.ico"; Tasks: quicklaunchicon
-
-[Registry]
-; Put bundled ffmpeg on PATH so the recorder finds it.
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
-    ValueType: expandsz; ValueName: "Path"; \
-    ValueData: "{olddata};{app}\ffmpeg"; \
-    Check: NeedsAddPath('{app}\ffmpeg')
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\KOZGU"
