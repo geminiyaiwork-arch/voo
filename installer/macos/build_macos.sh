@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  Visio Eye — macOS installer build orchestrator
+#  KO'ZGU — macOS installer build orchestrator
 #
 #  Requirements on the build machine:
 #    * macOS 11+ (Big Sur or later)
@@ -11,13 +11,13 @@
 #      installer/macos/build_macos.sh
 #
 #  Output:
-#      dist/VisioEye-1.7.0.dmg          ← drag-and-drop installer
-#      dist/Visio Eye.app/              ← raw .app bundle
+#      dist/KOZGU-1.8.0.dmg          ← drag-and-drop installer
+#      dist/KO'ZGU.app/              ← raw .app bundle
 # ============================================================
 set -euo pipefail
 
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../.." && pwd )"
-export VISIO_EYE_PROJECT_DIR="$PROJECT_DIR"
+export KOZGU_PROJECT_DIR="$PROJECT_DIR"
 cd "$PROJECT_DIR"
 
 VERSION="1.7.0"
@@ -48,8 +48,8 @@ chmod +x installer/macos/ffmpeg/ffmpeg installer/macos/ffmpeg/ffprobe
 
 echo
 echo "=== [4/5] Run PyInstaller ========================================"
-rm -rf build "dist/Visio Eye.app"
-python3 -m PyInstaller installer/macos/visio-eye.spec --noconfirm
+rm -rf build "dist/KO'ZGU.app"
+python3 -m PyInstaller installer/macos/kozgu.spec --noconfirm
 
 echo
 echo "=== [5/5] Build .dmg ============================================="
@@ -57,26 +57,26 @@ if ! command -v create-dmg >/dev/null; then
     echo "create-dmg missing; installing via Homebrew..."
     brew install create-dmg
 fi
-rm -f "dist/VisioEye-${VERSION}.dmg"
+rm -f "dist/KOZGU-${VERSION}.dmg"
 create-dmg \
-    --volname "Visio Eye ${VERSION}" \
+    --volname "KO'ZGU ${VERSION}" \
     --volicon "assets/img/logo.png" \
     --window-pos 200 120 \
     --window-size 600 380 \
     --icon-size 96 \
-    --icon "Visio Eye.app" 150 180 \
-    --hide-extension "Visio Eye.app" \
+    --icon "KO'ZGU.app" 150 180 \
+    --hide-extension "KO'ZGU.app" \
     --app-drop-link 450 180 \
-    "dist/VisioEye-${VERSION}.dmg" \
-    "dist/Visio Eye.app" \
-    || hdiutil create -volname "Visio Eye ${VERSION}" \
-                       -srcfolder "dist/Visio Eye.app" \
+    "dist/KOZGU-${VERSION}.dmg" \
+    "dist/KO'ZGU.app" \
+    || hdiutil create -volname "KO'ZGU ${VERSION}" \
+                       -srcfolder "dist/KO'ZGU.app" \
                        -ov -format UDZO \
-                       "dist/VisioEye-${VERSION}.dmg"
+                       "dist/KOZGU-${VERSION}.dmg"
 
 echo
 echo "============================================================"
 echo "  Build complete."
-echo "    Installer:  dist/VisioEye-${VERSION}.dmg"
-echo "    App bundle: dist/Visio Eye.app/"
+echo "    Installer:  dist/KOZGU-${VERSION}.dmg"
+echo "    App bundle: dist/KO'ZGU.app/"
 echo "============================================================"

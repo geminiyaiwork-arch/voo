@@ -2,7 +2,7 @@
 
 Linux: spawns ``parec`` reading from ``@DEFAULT_MONITOR@`` (PulseAudio
 or PipeWire-pulse). No PortAudio needed; parec is in
-``pulseaudio-utils`` which is already a Visio Eye dependency.
+``pulseaudio-utils`` which is already a KO'ZGU dependency.
 
 Windows: uses ``sounddevice`` (PortAudio) with WASAPI loopback on the
 default output device. WASAPI loopback is a built-in Windows feature

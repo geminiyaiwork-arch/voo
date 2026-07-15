@@ -1,4 +1,4 @@
-"""Settings persistence layer for Visio Eye."""
+"""Settings persistence layer for KO'ZGU."""
 from __future__ import annotations
 
 import json
@@ -17,19 +17,19 @@ IS_MACOS = sys.platform == "darwin"
 def _default_videos_dir() -> Path:
     if IS_WINDOWS:
         userprofile = os.environ.get("USERPROFILE") or str(Path.home())
-        return Path(userprofile) / "Videos" / "VisioEye"
+        return Path(userprofile) / "Videos" / "KOZGU"
     if IS_MACOS:
-        return Path.home() / "Movies" / "VisioEye"
-    return Path.home() / "Videos" / "VisioEye"
+        return Path.home() / "Movies" / "KOZGU"
+    return Path.home() / "Videos" / "KOZGU"
 
 
 def _default_config_dir() -> Path:
     if IS_WINDOWS:
         appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-        return Path(appdata) / "VisioEye"
+        return Path(appdata) / "KOZGU"
     if IS_MACOS:
-        return Path.home() / "Library" / "Application Support" / "VisioEye"
-    return Path.home() / ".config" / "visio-eye"
+        return Path.home() / "Library" / "Application Support" / "KOZGU"
+    return Path.home() / ".config" / "kozgu"
 
 
 _DEFAULT_CAMERA = "" if IS_WINDOWS else "/dev/video0"
@@ -127,7 +127,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
             "           border-radius:10px; font-weight:800;\n"
             "           box-shadow:0 8px 22px rgba(59,130,246,.45); }\n"
             "</style></head>\n"
-            "<body><div class=\"badge\">LIVE · Visio Eye</div></body></html>"
+            "<body><div class=\"badge\">LIVE · KO'ZGU</div></body></html>"
         ),
         "x": 40,
         "y": 40,
@@ -140,7 +140,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 
 class SettingsManager:
-    """Loads and saves settings to ~/.config/visio-eye/settings.json."""
+    """Loads and saves settings to ~/.config/kozgu/settings.json."""
 
     def __init__(self) -> None:
         self._config_dir = _default_config_dir()

@@ -1,6 +1,6 @@
 @echo off
 :: ============================================================
-::  Visio Eye — Windows installer build orchestrator.
+::  KO'ZGU — Windows installer build orchestrator.
 ::
 ::  Requirements (installed once on the build machine):
 ::    * Python 3.11+  (https://python.org)         python --version
@@ -16,13 +16,13 @@
 ::  Run from the project root:
 ::      installer\windows\build_windows.bat
 ::
-::  Output: dist\VisioEye-1.4.0-setup.exe
+::  Output: dist\KOZGU-1.8.0-setup.exe
 :: ============================================================
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0..\.."
 set "PROJECT_DIR=%CD%"
-set "VISIO_EYE_PROJECT_DIR=%PROJECT_DIR%"
+set "KOZGU_PROJECT_DIR=%PROJECT_DIR%"
 
 echo.
 echo === [1/5] Sanity check ===========================================
@@ -70,8 +70,8 @@ if not exist "installer\windows\vc_redist.x64.exe" (
 echo.
 echo === [4/5] Run PyInstaller =======================================
 if exist build rmdir /s /q build
-if exist dist\visio-eye rmdir /s /q dist\visio-eye
-python -m PyInstaller installer\windows\visio-eye.spec --noconfirm || exit /b 1
+if exist dist\kozgu rmdir /s /q dist\kozgu
+python -m PyInstaller installer\windows\kozgu.spec --noconfirm || exit /b 1
 
 echo.
 echo === [5/5] Compile installer with Inno Setup =====================
@@ -79,17 +79,17 @@ where iscc >nul 2>nul
 if errorlevel 1 (
     echo WARNING: iscc.exe not on PATH. Skipping installer compilation.
     echo Install Inno Setup 6 from https://jrsoftware.org/isdl.php then
-    echo re-run this script, or open visio-eye.iss in the Inno IDE.
-    echo PyInstaller output is in: dist\visio-eye\
+    echo re-run this script, or open kozgu.iss in the Inno IDE.
+    echo PyInstaller output is in: dist\kozgu\
     exit /b 0
 )
-iscc installer\windows\visio-eye.iss || exit /b 1
+iscc installer\windows\kozgu.iss || exit /b 1
 
 echo.
 echo ============================================================
 echo  Build complete.
-echo  Installer:  dist\VisioEye-1.4.0-setup.exe
-echo  Portable :  dist\visio-eye\visio-eye.exe
+echo  Installer:  dist\KOZGU-1.8.0-setup.exe
+echo  Portable :  dist\kozgu\kozgu.exe
 echo ============================================================
 echo.
 echo  TIP: this installer matches your current Python bitness.

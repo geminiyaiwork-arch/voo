@@ -1,4 +1,4 @@
-# Visio Eye
+# KO'ZGU
 
 Professional screen + audio recorder for Linux (Kali / Ubuntu / Debian).
 Python 3 + PyQt6 UI, FFmpeg recording engine.
@@ -44,8 +44,8 @@ lunx/
 │   ├── install.sh               # system install to /opt
 │   ├── uninstall.sh
 │   ├── build_deb.sh             # builds a .deb package
-│   └── visio-eye.desktop
-├── visio-eye                 # launcher script
+│   └── kozgu.desktop
+├── kozgu                 # launcher script
 ├── requirements.txt
 └── README.md
 ```
@@ -64,7 +64,7 @@ sudo apt install -y python3 python3-pip ffmpeg v4l-utils xdotool scrot \
 pip3 install --break-system-packages -r requirements.txt
 
 # 3. run
-./visio-eye
+./kozgu
 ```
 
 ---
@@ -75,9 +75,9 @@ pip3 install --break-system-packages -r requirements.txt
 sudo bash installer/install.sh
 ```
 
-This copies the project to `/opt/visio-eye`, creates the desktop entry,
+This copies the project to `/opt/kozgu`, creates the desktop entry,
 installs Python dependencies and creates a symlink at
-`/usr/local/bin/visio-eye`.
+`/usr/local/bin/kozgu`.
 
 Uninstall:
 
@@ -91,7 +91,7 @@ sudo bash installer/uninstall.sh
 
 ```bash
 bash installer/build_deb.sh
-sudo apt install dist/visio-eye_1.3.0_all.deb
+sudo apt install dist/kozgu_1.3.0_all.deb
 ```
 
 The package depends on `ffmpeg`, `v4l-utils`, `xdotool`, `scrot`,
@@ -101,13 +101,13 @@ The package depends on `ffmpeg`, `v4l-utils`, `xdotool`, `scrot`,
 
 ## Usage
 
-1. Launch **Visio Eye** from the application menu (or run
-   `visio-eye`).
+1. Launch **KO'ZGU** from the application menu (or run
+   `kozgu`).
 2. Choose **mode** — full screen, selected area, or active window.
 3. Pick **quality**, **FPS** and **audio source**.
 4. Toggle **Camera** / **Logo** overlays as needed and drag them to position.
 5. Press **● Record** (or `F9`).
-6. Press **■ Stop** (or `F11`). MP4 is saved to `~/Videos/VisioEye/` by
+6. Press **■ Stop** (or `F11`). MP4 is saved to `~/Videos/KOZGU/` by
    default.
 
 Open **Settings → AUTOR** to see developer contact info.
@@ -131,8 +131,8 @@ Hotkeys are editable in **Settings → Hotkeys**.
   X11. The app sets `QT_QPA_PLATFORM=xcb` automatically.
 - GPU encoding works automatically when `h264_nvenc` / `hevc_nvenc` / VAAPI
   encoders are available in your FFmpeg build.
-- Settings live at `~/.config/visio-eye/settings.json`.
-- Recordings default to `~/Videos/VisioEye/record_YYYY_MM_DD_HH_MM_SS.mp4`.
+- Settings live at `~/.config/kozgu/settings.json`.
+- Recordings default to `~/Videos/KOZGU/record_YYYY_MM_DD_HH_MM_SS.mp4`.
 
 ---
 

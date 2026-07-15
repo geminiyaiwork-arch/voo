@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# Build a .deb package for Visio Eye.
-# Output: dist/visio-eye_<VERSION>_all.deb
+# Build a .deb package for KO'ZGU.
+# Output: dist/kozgu_<VERSION>_all.deb
 set -e
 
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-VERSION="1.7.0"
-PKG_NAME="visio-eye_${VERSION}_all"
+VERSION="1.8.0"
+PKG_NAME="kozgu_${VERSION}_all"
 STAGING="$PROJECT_DIR/build/$PKG_NAME"
 DIST_DIR="$PROJECT_DIR/dist"
 
 rm -rf "$STAGING"
 mkdir -p "$STAGING/DEBIAN"
-mkdir -p "$STAGING/opt/visio-eye"
+mkdir -p "$STAGING/opt/kozgu"
 mkdir -p "$STAGING/usr/local/bin"
 mkdir -p "$STAGING/usr/share/applications"
 mkdir -p "$STAGING/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$DIST_DIR"
 
 # ---- payload ----
-cp -r "$PROJECT_DIR/src"      "$STAGING/opt/visio-eye/"
-cp -r "$PROJECT_DIR/assets"   "$STAGING/opt/visio-eye/"
-cp    "$PROJECT_DIR/visio-eye"     "$STAGING/opt/visio-eye/visio-eye"
-cp    "$PROJECT_DIR/requirements.txt" "$STAGING/opt/visio-eye/"
-chmod +x "$STAGING/opt/visio-eye/visio-eye"
+cp -r "$PROJECT_DIR/src"      "$STAGING/opt/kozgu/"
+cp -r "$PROJECT_DIR/assets"   "$STAGING/opt/kozgu/"
+cp    "$PROJECT_DIR/kozgu"     "$STAGING/opt/kozgu/kozgu"
+cp    "$PROJECT_DIR/requirements.txt" "$STAGING/opt/kozgu/"
+chmod +x "$STAGING/opt/kozgu/kozgu"
 
-ln -sf /opt/visio-eye/visio-eye "$STAGING/usr/local/bin/visio-eye"
+ln -sf /opt/kozgu/kozgu "$STAGING/usr/local/bin/kozgu"
 
-cp "$PROJECT_DIR/installer/visio-eye.desktop" \
-   "$STAGING/usr/share/applications/visio-eye.desktop"
+cp "$PROJECT_DIR/installer/kozgu.desktop" \
+   "$STAGING/usr/share/applications/kozgu.desktop"
 
 ICON_SRC=""
 if [ -f "$PROJECT_DIR/assets/img/logo.png" ]; then
@@ -37,22 +37,22 @@ elif [ -f "$PROJECT_DIR/assets/img/author.png" ]; then
 fi
 if [ -n "$ICON_SRC" ]; then
     cp "$ICON_SRC" \
-       "$STAGING/usr/share/icons/hicolor/256x256/apps/visio-eye.png"
+       "$STAGING/usr/share/icons/hicolor/256x256/apps/kozgu.png"
 fi
 
 # ---- control ----
 cat > "$STAGING/DEBIAN/control" <<EOF
-Package: visio-eye
+Package: kozgu
 Version: ${VERSION}
 Section: video
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.10), python3-pip, python3-dbus, python3-gi, gir1.2-glib-2.0, python3-pyqt6.qtwebengine, ffmpeg, v4l-utils, xdotool, scrot, gstreamer1.0-tools, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, gstreamer1.0-plugins-ugly, gstreamer1.0-libav, gstreamer1.0-pipewire, gstreamer1.0-pulseaudio, libxcb-cursor0
 Recommends: pulseaudio-utils, libxcb-xinerama0, pipewire
-Conflicts: voo-recorder
-Replaces: voo-recorder
+Conflicts: voo-recorder, visio-eye
+Replaces: voo-recorder, visio-eye
 Maintainer: Elyorbek <elyorbek-13@mail.ru>
-Description: Visio Eye - all-in-one recorder + dubbing + streaming
+Description: KO'ZGU - all-in-one recorder + dubbing + streaming
  Records the screen with system + microphone audio, webcam overlay,
  logo overlay, fully custom HTML/CSS/JS overlay rendered through
  Chromium WebEngine, multi-resolution output up to 4K and FFmpeg-powered
@@ -64,13 +64,13 @@ EOF
 
 cat > "$STAGING/DEBIAN/postinst" <<'EOF'
 #!/bin/bash
-# Visio Eye postinst — make sure every runtime tool the recording
+# KO'ZGU postinst — make sure every runtime tool the recording
 # and streaming pipelines need is actually installed.  We do NOT
 # rely solely on Depends because users sometimes install with
 # `dpkg -i` which skips dep resolution.
 set -e
 
-log() { printf "[visio-eye/postinst] %s\n" "$*"; }
+log() { printf "[kozgu/postinst] %s\n" "$*"; }
 
 # ---- 1. APT dependencies (only if missing) ------------------------
 APT_REQ=(
@@ -138,7 +138,7 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 fi
 
 # ---- 5. Quick health summary --------------------------------------
-log "Visio Eye installed.  Tooling check:"
+log "KO'ZGU installed.  Tooling check:"
 for t in ffmpeg gst-launch-1.0 parec paplay pactl; do
     if command -v "$t" >/dev/null 2>&1; then
         log "  ✓ $t"

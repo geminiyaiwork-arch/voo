@@ -1,4 +1,4 @@
-"""Language bundles for Visio Eye.
+"""Language bundles for KO'ZGU.
 
 Each language is a flat ``key -> string`` dict. Keys are slugs (short,
 snake_case, English) so they're stable across translations. ``en``
@@ -67,7 +67,7 @@ TRANSLATIONS = {
         "region.hint": "Drag to select a region · ESC to cancel",
         # ----- settings dialog -----
         "settings.title": "Settings",
-        "settings.window_title": "Visio Eye — Settings",
+        "settings.window_title": "KO'ZGU — Settings",
         "settings.tab.general": "General",
         "settings.tab.video": "Video",
         "settings.tab.audio": "Audio",
@@ -92,7 +92,7 @@ TRANSLATIONS = {
         "general.lang_changed_title": "Restart required",
         "general.lang_changed_body":
             "The language change will be fully applied after restarting "
-            "Visio Eye.",
+            "KO'ZGU.",
         # video
         "video.fps": "FPS",
         "video.resolution": "Resolution",
@@ -165,7 +165,7 @@ TRANSLATIONS = {
         "dub.yandex_folder": "Yandex folder ID",
         "dub.yandex_placeholder": "Optional — for best Uzbek quality",
         "dub.hint":
-            "When enabled, Visio Eye feeds system audio into Whisper, "
+            "When enabled, KO'ZGU feeds system audio into Whisper, "
             "translates EN/RU text to Uzbek and overlays Edge TTS audio "
             "into the recording.  The original soundtrack is "
             "<b>removed</b> from the saved file.  Internet and the "
@@ -184,7 +184,7 @@ TRANSLATIONS = {
         "stream.target.key_placeholder": "Stream key (paste from platform)",
         "stream.target.url_placeholder": "rtmp://... (auto-filled per platform)",
         "stream.hint":
-            "When recording starts Visio Eye relays the screen to each "
+            "When recording starts KO'ZGU relays the screen to each "
             "enabled platform in real-time via RTMP.  The <b>stream key</b> "
             "for each platform is taken from its 'Go Live' page.",
         # html overlay
@@ -199,7 +199,7 @@ TRANSLATIONS = {
         "html.transparent_bg": "Transparent background",
         "html.code": "HTML / CSS / JavaScript code",
         "html.hint":
-            "Visio Eye uses Chromium-based WebEngine — full HTML5 + CSS3 + "
+            "KO'ZGU uses Chromium-based WebEngine — full HTML5 + CSS3 + "
             "JavaScript is supported. Leave the body background transparent "
             "to overlay on top of any application.",
     },
@@ -263,7 +263,7 @@ TRANSLATIONS = {
         "region.hint": "Soha tanlash uchun sichqoncha bilan torting · ESC bekor qiladi",
         # settings
         "settings.title": "Sozlamalar",
-        "settings.window_title": "Visio Eye — Sozlamalar",
+        "settings.window_title": "KO'ZGU — Sozlamalar",
         "settings.tab.general": "Umumiy",
         "settings.tab.video": "Video",
         "settings.tab.audio": "Audio",
@@ -286,7 +286,7 @@ TRANSLATIONS = {
         "general.start_with_system": "Tizim bilan birga ishga tushsin",
         "general.lang_changed_title": "Qayta ishga tushirish kerak",
         "general.lang_changed_body":
-            "Til o'zgarishi Visio Eye qayta ishga tushganidan keyin "
+            "Til o'zgarishi KO'ZGU qayta ishga tushganidan keyin "
             "to'liq qo'llaniladi.",
         "video.fps": "Kadr tezligi",
         "video.resolution": "O'lcham",
@@ -354,7 +354,7 @@ TRANSLATIONS = {
         "dub.yandex_folder": "Yandex folder ID",
         "dub.yandex_placeholder": "Ixtiyoriy — eng yaxshi o'zbek sifati uchun",
         "dub.hint":
-            "Dublyator yoqilganda Visio Eye tizim audio'sini Whisper'ga "
+            "Dublyator yoqilganda KO'ZGU tizim audio'sini Whisper'ga "
             "uzatadi, EN/RU matnni o'zbekchaga tarjima qiladi va Edge TTS "
             "ovozini videoga yozadi. Original audio yozilgan faylda "
             "<b>eshitilmaydi</b>. Internet va Whisper modeli kerak.",
@@ -371,7 +371,7 @@ TRANSLATIONS = {
         "stream.target.key_placeholder": "Strim kaliti (platformadan oling)",
         "stream.target.url_placeholder": "rtmp://... (platforma bo'yicha avto-to'ladi)",
         "stream.hint":
-            "Yozish boshlanganda Visio Eye ekranni har bir yoqilgan "
+            "Yozish boshlanganda KO'ZGU ekranni har bir yoqilgan "
             "platformaga real-vaqt RTMP orqali jonli efirga uzatadi. "
             "<b>Strim kaliti</b> har bir platforma 'Go Live' sahifasidan olinadi.",
         "html.enable": "Ekranda HTML overlay ko'rsatish (yozuv + strimda ko'rinadi)",
@@ -385,7 +385,7 @@ TRANSLATIONS = {
         "html.transparent_bg": "Shaffof fon",
         "html.code": "HTML / CSS / JavaScript kodi",
         "html.hint":
-            "Visio Eye Chromium asosida WebEngine ishlatadi — to'liq HTML5 + "
+            "KO'ZGU Chromium asosida WebEngine ishlatadi — to'liq HTML5 + "
             "CSS3 + JavaScript qo'llab-quvvatlanadi. Body fonini shaffof "
             "qoldirsangiz overlay har qanday ilova ustida ko'rinadi.",
     },
@@ -447,7 +447,7 @@ TRANSLATIONS = {
             "        gstreamer1.0-pipewire python3-dbus python3-gi",
         "region.hint": "Выделите область мышью · ESC чтобы отменить",
         "settings.title": "Настройки",
-        "settings.window_title": "Visio Eye — Настройки",
+        "settings.window_title": "KO'ZGU — Настройки",
         "settings.tab.general": "Общие",
         "settings.tab.video": "Видео",
         "settings.tab.audio": "Аудио",
@@ -470,7 +470,7 @@ TRANSLATIONS = {
         "general.start_with_system": "Запускать вместе с системой",
         "general.lang_changed_title": "Требуется перезапуск",
         "general.lang_changed_body":
-            "Смена языка вступит в силу после перезапуска Visio Eye.",
+            "Смена языка вступит в силу после перезапуска KO'ZGU.",
         "video.fps": "FPS",
         "video.resolution": "Разрешение",
         "video.codec": "Кодек",
@@ -537,7 +537,7 @@ TRANSLATIONS = {
         "dub.yandex_folder": "Folder ID Яндекс",
         "dub.yandex_placeholder": "Необязательно — для лучшего узбекского",
         "dub.hint":
-            "Когда включено, Visio Eye отправляет системный звук в Whisper, "
+            "Когда включено, KO'ZGU отправляет системный звук в Whisper, "
             "переводит EN/RU в узбекский и накладывает голос Edge TTS на "
             "запись.  Оригинальная дорожка в сохранённом файле "
             "<b>удаляется</b>.  Требуется интернет и модель Whisper.",
@@ -554,7 +554,7 @@ TRANSLATIONS = {
         "stream.target.key_placeholder": "Stream key (скопируйте с платформы)",
         "stream.target.url_placeholder": "rtmp://... (заполняется автоматически)",
         "stream.hint":
-            "Когда запись стартует, Visio Eye параллельно ретранслирует "
+            "Когда запись стартует, KO'ZGU параллельно ретранслирует "
             "экран на каждую включённую платформу через RTMP. "
             "<b>Stream key</b> берётся со страницы 'Go Live' платформы.",
         "html.enable": "Показывать HTML-оверлей (виден в записи и трансляции)",
@@ -568,7 +568,7 @@ TRANSLATIONS = {
         "html.transparent_bg": "Прозрачный фон",
         "html.code": "Код HTML / CSS / JavaScript",
         "html.hint":
-            "Visio Eye использует Chromium WebEngine — поддерживаются HTML5 + "
+            "KO'ZGU использует Chromium WebEngine — поддерживаются HTML5 + "
             "CSS3 + JavaScript полностью. Оставьте фон body прозрачным, чтобы "
             "оверлей лежал поверх любого приложения.",
     },

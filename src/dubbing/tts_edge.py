@@ -5,7 +5,7 @@ Voices supported by Microsoft for uz-UZ:
   - uz-UZ-SardorNeural    (Male)
 
 We synthesise to PCM 24 kHz mono and return raw bytes.  The audio
-router pipes those bytes into the visio-eye-dub virtual sink.
+router pipes those bytes into the kozgu-dub virtual sink.
 """
 from __future__ import annotations
 

@@ -40,7 +40,7 @@ class AuthorDialog(QDialog):
     def __init__(self, parent: QWidget | None = None,
                  image_path: str | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Autor — Visio Eye")
+        self.setWindowTitle("Autor — KO'ZGU")
         self.setModal(True)
         self.setMinimumSize(420, 520)
         self.setStyleSheet("""
@@ -110,7 +110,7 @@ class AuthorDialog(QDialog):
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(name)
 
-        role = QLabel("Developer · Visio Eye")
+        role = QLabel("Developer · KO'ZGU")
         role.setObjectName("role")
         role.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(role)

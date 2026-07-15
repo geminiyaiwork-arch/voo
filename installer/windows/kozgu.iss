@@ -1,30 +1,30 @@
 ; ============================================================
-; Visio Eye — Inno Setup installer script
+; KO'ZGU — Inno Setup installer script
 ;
-; Compile on Windows with: iscc installer\windows\visio-eye.iss
+; Compile on Windows with: iscc installer\windows\kozgu.iss
 ; (Inno Setup 6.x: https://jrsoftware.org/isdl.php)
 ;
-; Expects PyInstaller to have produced  dist\visio-eye\  first.
+; Expects PyInstaller to have produced  dist\kozgu\  first.
 ; ============================================================
 
-#define MyAppName "Visio Eye"
-#define MyAppVersion "1.4.0"
+#define MyAppName "KO'ZGU"
+#define MyAppVersion "1.8.0"
 #define MyAppPublisher "Elyorbek"
-#define MyAppExeName "visio-eye.exe"
+#define MyAppExeName "kozgu.exe"
 #define MyAppURL "https://t.me/visio_eye"
 
 [Setup]
-AppId={{C9E0F4D2-7B23-4F89-A6F1-VisioEye-2C3D4E5F}}
+AppId={{C9E0F4D2-7B23-4F89-A6F1-KOZGU-2C3D4E5F}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
-DefaultDirName={autopf}\Visio Eye
-DefaultGroupName=Visio Eye
+DefaultDirName={autopf}\KO'ZGU
+DefaultGroupName=KO'ZGU
 DisableProgramGroupPage=yes
 OutputDir=..\..\dist
-OutputBaseFilename=VisioEye-{#MyAppVersion}-setup
+OutputBaseFilename=KOZGU-{#MyAppVersion}-setup
 SetupIconFile=..\..\assets\img\logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
@@ -50,8 +50,8 @@ Name: "quicklaunchicon"; Description: "Create a &Quick Launch icon"; \
     GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-; PyInstaller produces a folder dist\visio-eye\ — copy the entire tree.
-Source: "..\..\dist\visio-eye\*"; DestDir: "{app}"; \
+; PyInstaller produces a folder dist\kozgu\ — copy the entire tree.
+Source: "..\..\dist\kozgu\*"; DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 ; FFmpeg + ffprobe — bundled by build_windows.bat from gyan.dev.
 Source: "ffmpeg\ffmpeg.exe"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion skipifsourcedoesntexist
@@ -90,7 +90,7 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environmen
     Check: NeedsAddPath('{app}\ffmpeg')
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{userappdata}\VisioEye"
+Type: filesandordirs; Name: "{userappdata}\KOZGU"
 
 [Code]
 function NeedsAddPath(Param: string): Boolean;

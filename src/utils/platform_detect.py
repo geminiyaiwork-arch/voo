@@ -22,10 +22,10 @@ def default_videos_dir() -> Path:
     """Platform-correct default folder for recordings."""
     if IS_WINDOWS:
         userprofile = os.environ.get("USERPROFILE") or str(Path.home())
-        return Path(userprofile) / "Videos" / "VisioEye"
+        return Path(userprofile) / "Videos" / "KOZGU"
     if IS_MACOS:
-        return Path.home() / "Movies" / "VisioEye"
-    return Path.home() / "Videos" / "VisioEye"
+        return Path.home() / "Movies" / "KOZGU"
+    return Path.home() / "Videos" / "KOZGU"
 
 
 def default_camera_device() -> str:

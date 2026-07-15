@@ -1,18 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for Visio Eye (Windows).
+# PyInstaller spec for KO'ZGU (Windows).
 #
 # Run from the project root on Windows:
-#     pyinstaller installer\windows\visio-eye.spec --noconfirm
+#     pyinstaller installer\windows\kozgu.spec --noconfirm
 #
-# Output: dist\visio-eye\visio-eye.exe plus its bundled runtime.
-# The Inno Setup script (visio-eye.iss) packages that folder into an
+# Output: dist\kozgu\kozgu.exe plus its bundled runtime.
+# The Inno Setup script (kozgu.iss) packages that folder into an
 # installer .exe.
 
 import os
 import sys
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("VISIO_EYE_PROJECT_DIR", os.getcwd())).resolve()
+PROJECT_DIR = Path(os.environ.get("KOZGU_PROJECT_DIR", os.getcwd())).resolve()
 ASSETS = PROJECT_DIR / "assets"
 SRC = PROJECT_DIR / "src"
 
@@ -70,7 +70,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="visio-eye",
+    name="kozgu",
     debug=False,
     strip=False,
     upx=False,
@@ -87,5 +87,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="visio-eye",
+    name="kozgu",
 )

@@ -32,7 +32,7 @@ class HtmlOverlay(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Visio Eye — HTML Overlay")
+        self.setWindowTitle("KO'ZGU — HTML Overlay")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint

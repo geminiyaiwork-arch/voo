@@ -1,4 +1,4 @@
-"""Lightweight i18n layer for Visio Eye.
+"""Lightweight i18n layer for KO'ZGU.
 
 We keep everything in a single Python dict (``translations.py``) keyed
 by short slugs.  The application picks the language at boot from

@@ -1,4 +1,4 @@
-"""Visio Eye — application entry point."""
+"""KO'ZGU — application entry point."""
 from __future__ import annotations
 
 import os
@@ -32,9 +32,9 @@ def main() -> int:
         os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Visio Eye")
-    app.setApplicationDisplayName("Visio Eye")
-    app.setOrganizationName("Visio Eye")
+    app.setApplicationName("KO'ZGU")
+    app.setApplicationDisplayName("KO'ZGU")
+    app.setOrganizationName("KO'ZGU")
     app.setStyle("Fusion")
     check_icon = Path(__file__).resolve().parents[1] / "assets" / "icons" / "check_white.svg"
     app.setStyleSheet(APP_STYLE.replace("{CHECK_ICON}", str(check_icon)))

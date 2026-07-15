@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, settings: SettingsManager) -> None:
         super().__init__()
-        self.setWindowTitle(f"Visio Eye — {tr('app.subtitle')}")
+        self.setWindowTitle(f"KO'ZGU — {tr('app.subtitle')}")
         self.setMinimumSize(1080, 680)
         check_icon = (Path(__file__).resolve().parents[2]
                        / "assets" / "icons" / "check_white.svg")
@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
         sb.setContentsMargins(18, 18, 14, 18)
         sb.setSpacing(8)
 
-        brand = QLabel("Visio Eye")
+        brand = QLabel("KO'ZGU")
         brand.setStyleSheet(
             "color:#2563eb;font-size:24px;font-weight:900;letter-spacing:2px;"
         )
@@ -642,7 +642,7 @@ class MainWindow(QMainWindow):
             f"Whisper {model_size} modelini yuklab olish (~1.5 GB)…",
             "Bekor qilish", 0, 100, self,
         )
-        dlg.setWindowTitle("Visio Eye — Dublyator")
+        dlg.setWindowTitle("KO'ZGU — Dublyator")
         dlg.setMinimumDuration(0)
         dlg.setAutoClose(True)
         dlg.setAutoReset(False)

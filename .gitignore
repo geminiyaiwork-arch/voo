@@ -38,10 +38,10 @@ installer/macos/ffmpeg/ffmpeg
 installer/macos/ffmpeg/ffprobe
 
 # Downloaded artifacts
-VisioEye-Windows-Installer/
-VisioEye-Windows-Portable/
-VisioEye-macOS-DMG/
-VisioEye-macOS-App/
+KOZGU-Windows-Installer/
+KOZGU-Windows-Portable/
+KOZGU-macOS-DMG/
+KOZGU-macOS-App/
 
 # Logs
 *.log

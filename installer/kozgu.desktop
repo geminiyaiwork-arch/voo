@@ -1,13 +1,13 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Visio Eye
+Name=KO'ZGU
 GenericName=Screen Recorder
 Comment=Professional screen + audio recording with camera and logo overlays
-Exec=/opt/visio-eye/visio-eye
-Icon=/opt/visio-eye/assets/img/logo.png
+Exec=/opt/kozgu/kozgu
+Icon=/opt/kozgu/assets/img/logo.png
 Terminal=false
 Categories=AudioVideo;Recorder;Video;
 Keywords=screen;record;capture;video;ffmpeg;
 StartupNotify=true
-StartupWMClass=Visio Eye
+StartupWMClass=KO'ZGU

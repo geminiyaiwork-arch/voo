@@ -1,16 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for Visio Eye on macOS.
+# PyInstaller spec for KO'ZGU on macOS.
 #
 # Run from the project root on a macOS build machine:
-#     pyinstaller installer/macos/visio-eye.spec --noconfirm
+#     pyinstaller installer/macos/kozgu.spec --noconfirm
 #
-# Output: dist/Visio Eye.app   (a fully-wrapped .app bundle)
+# Output: dist/KO'ZGU.app   (a fully-wrapped .app bundle)
 # A separate shell script (build_macos.sh) turns the .app into a .dmg.
 
 import os
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("VISIO_EYE_PROJECT_DIR", os.getcwd())).resolve()
+PROJECT_DIR = Path(os.environ.get("KOZGU_PROJECT_DIR", os.getcwd())).resolve()
 ASSETS = PROJECT_DIR / "assets"
 SRC = PROJECT_DIR / "src"
 
@@ -60,7 +60,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="visio-eye",
+    name="kozgu",
     debug=False,
     strip=False,
     upx=False,
@@ -76,30 +76,30 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="visio-eye",
+    name="kozgu",
 )
 
 # Wrap the COLLECT into a proper .app bundle so macOS treats it as an
 # application (Launchpad icon, Dock entry, Info.plist permissions).
 app = BUNDLE(
     coll,
-    name="Visio Eye.app",
+    name="KO'ZGU.app",
     icon=str(ASSETS / "img" / "logo.png"),
-    bundle_identifier="com.visio.eye",
-    version="1.7.0",
+    bundle_identifier="uz.kozgu.app",
+    version="1.8.0",
     info_plist={
-        "CFBundleName": "Visio Eye",
-        "CFBundleDisplayName": "Visio Eye",
-        "CFBundleShortVersionString": "1.7.0",
-        "CFBundleVersion": "1.7.0",
+        "CFBundleName": "KO'ZGU",
+        "CFBundleDisplayName": "KO'ZGU",
+        "CFBundleShortVersionString": "1.8.0",
+        "CFBundleVersion": "1.8.0",
         "LSMinimumSystemVersion": "11.0",
         "NSHighResolutionCapable": True,
         # Permissions prompts that macOS shows on first launch:
         "NSCameraUsageDescription":
-            "Visio Eye uses the camera for the webcam overlay.",
+            "KO'ZGU uses the camera for the webcam overlay.",
         "NSMicrophoneUsageDescription":
-            "Visio Eye uses the microphone for narration.",
+            "KO'ZGU uses the microphone for narration.",
         "NSScreenCaptureUsageDescription":
-            "Visio Eye records the screen for video capture and streaming.",
+            "KO'ZGU records the screen for video capture and streaming.",
     },
 )

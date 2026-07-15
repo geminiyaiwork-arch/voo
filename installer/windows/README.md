@@ -1,8 +1,8 @@
-# Visio Eye — Windows Build Instructions
+# KO'ZGU — Windows Build Instructions
 
 This directory contains everything you need to produce a Windows
-installer (`VisioEye-1.4.0-setup.exe`) and a portable folder
-(`dist\visio-eye\visio-eye.exe`).
+installer (`KOZGU-1.4.0-setup.exe`) and a portable folder
+(`dist\kozgu\kozgu.exe`).
 
 The codebase itself is fully cross-platform. The Linux `.deb` continues
 to work; this folder only adds the Windows packaging.
@@ -13,18 +13,18 @@ to work; this folder only adds the Windows packaging.
 
 | Artifact                                | Path                                    |
 | --------------------------------------- | --------------------------------------- |
-| Single-file installer (recommended)     | `dist\VisioEye-1.4.0-setup.exe`      |
-| Portable folder (no install)            | `dist\visio-eye\visio-eye.exe`    |
+| Single-file installer (recommended)     | `dist\KOZGU-1.4.0-setup.exe`      |
+| Portable folder (no install)            | `dist\kozgu\kozgu.exe`    |
 
 The installer is **fully self-contained**:
-- Installs to `C:\Program Files\Visio Eye\`
+- Installs to `C:\Program Files\KO'ZGU\`
 - Creates Start Menu shortcut + optional desktop icon (with `logo.ico`)
 - Adds bundled `ffmpeg\` to `PATH`
 - Auto-installs Visual C++ 2015-2022 Redistributable if missing
 - Registers a clean uninstaller in **Apps & Features**
 
 End users need **no Python, no pip, no FFmpeg, no GStreamer** —
-everything is bundled inside `visio-eye.exe` thanks to PyInstaller.
+everything is bundled inside `kozgu.exe` thanks to PyInstaller.
 
 ---
 
@@ -56,7 +56,7 @@ installer\windows\build_windows.bat
 The script:
 1. Installs PyInstaller + project requirements
 2. Refreshes `logo.ico` from `logo.png`
-3. Runs PyInstaller using `visio-eye.spec`
+3. Runs PyInstaller using `kozgu.spec`
 4. Calls Inno Setup compiler (`iscc`) to produce the final installer
 
 **Time**: 2–5 minutes on a typical machine.
@@ -71,10 +71,10 @@ If something goes wrong, run the steps individually:
 pip install --upgrade pip pyinstaller
 pip install -r requirements.txt
 
-set VISIO_EYE_PROJECT_DIR=%CD%
-pyinstaller installer\windows\visio-eye.spec --noconfirm
+set KOZGU_PROJECT_DIR=%CD%
+pyinstaller installer\windows\kozgu.spec --noconfirm
 
-iscc installer\windows\visio-eye.iss
+iscc installer\windows\kozgu.iss
 ```
 
 ---
@@ -84,7 +84,7 @@ iscc installer\windows\visio-eye.iss
 After PyInstaller finishes you can launch the app without installing:
 
 ```cmd
-dist\visio-eye\visio-eye.exe
+dist\kozgu\kozgu.exe
 ```
 
 This is useful for testing before signing/distributing the installer.
@@ -102,8 +102,8 @@ This is useful for testing before signing/distributing the installer.
 | Pause/Resume         | `SIGSTOP` / `SIGCONT`          | `SuspendThread` / `ResumeThread` |
 | Stop                 | `q` then `SIGINT`              | `q` then `CTRL_BREAK_EVENT`    |
 | GPU encoders         | `nvenc`, `vaapi`               | `nvenc`, `qsv`, `amf`          |
-| Settings folder      | `~/.config/visio-eye/`      | `%APPDATA%\VisioEye\`       |
-| Default output       | `~/Videos/VisioEye/`        | `%USERPROFILE%\Videos\VisioEye\` |
+| Settings folder      | `~/.config/kozgu/`      | `%APPDATA%\KOZGU\`       |
+| Default output       | `~/Videos/KOZGU/`        | `%USERPROFILE%\Videos\KOZGU\` |
 
 ---
 
@@ -114,12 +114,12 @@ There are three common solutions:
 
 1. **Enable "Stereo Mix"** in `mmsys.cpl` → Recording → right-click → Show
    disabled devices → enable Stereo Mix.
-   Then in Visio Eye: Settings → Audio → Desktop Audio = "Stereo Mix".
+   Then in KO'ZGU: Settings → Audio → Desktop Audio = "Stereo Mix".
 2. **Install [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)** and
    pick `CABLE Output` as the Desktop Audio device.
 3. **Install OBS Virtual Audio** (comes with OBS Studio if installed).
 
-Visio Eye's enumeration shows whatever DirectShow capture devices the
+KO'ZGU's enumeration shows whatever DirectShow capture devices the
 OS exposes, so these solutions work out of the box.
 
 ---
@@ -132,7 +132,7 @@ Run `pip install -r requirements.txt` first.
 **`iscc is not recognized as an internal or external command`**
 Inno Setup is installed but its bin folder isn't on PATH. Either add
 `C:\Program Files (x86)\Inno Setup 6` to PATH, or open
-`visio-eye.iss` in the Inno Setup IDE and click "Compile".
+`kozgu.iss` in the Inno Setup IDE and click "Compile".
 
 **`FFmpeg not found` after install**
 Either the bundled `ffmpeg` folder wasn't included (check that
@@ -153,8 +153,8 @@ it from. To ship both, install **two** Python interpreters side by
 side (e.g. Python 3.11 64-bit and Python 3.11 32-bit) and run
 `build_windows.bat` once with each. Rename the outputs to e.g.
 
-- `VisioEye-1.4.0-setup-x64.exe`
-- `VisioEye-1.4.0-setup-x86.exe`
+- `KOZGU-1.4.0-setup-x64.exe`
+- `KOZGU-1.4.0-setup-x86.exe`
 
 64-bit is strongly recommended whenever possible — the bundled
 `faster-whisper` ASR routinely uses 1.5–3 GB of address space during
@@ -166,7 +166,7 @@ smaller Whisper models in Settings → Dubbing.
 
 ## Live dubbing on Windows (EN/RU → UZ)
 
-Visio Eye ships a real-time dubbing engine. On Windows it needs two
+KO'ZGU ships a real-time dubbing engine. On Windows it needs two
 pieces in addition to FFmpeg:
 
 1. **WASAPI loopback** — built into Windows Vista+, no install needed.
@@ -174,7 +174,7 @@ pieces in addition to FFmpeg:
    feeds it to Whisper.
 2. **VB-Audio Virtual Cable** —
    <https://vb-audio.com/Cable/> (free).
-   After install, reboot, then in Visio Eye:
+   After install, reboot, then in KO'ZGU:
    - Open Settings → **Dubbing** → tick *Enable live dubbing*.
    - The router automatically picks `CABLE Input` as the dub output
      and `CABLE Output` as the recorder input, so the finished `.mp4`
@@ -195,11 +195,11 @@ Device to **CPU** and pick **medium** or **small** as the model.
 
 ## Sign the installer (optional, for distribution)
 
-To avoid SmartScreen warnings, sign `VisioEye-1.4.0-setup.exe`:
+To avoid SmartScreen warnings, sign `KOZGU-1.4.0-setup.exe`:
 
 ```cmd
 signtool sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a ^
-    dist\VisioEye-1.4.0-setup.exe
+    dist\KOZGU-1.4.0-setup.exe
 ```
 
 (Requires a code-signing certificate. Without it, users will see a

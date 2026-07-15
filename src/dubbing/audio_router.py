@@ -1,8 +1,8 @@
 """Cross-platform audio routing for the dubbing pipeline.
 
-Linux: creates a PulseAudio null-sink ``visio-eye-dub``. TTS bytes go
+Linux: creates a PulseAudio null-sink ``kozgu-dub``. TTS bytes go
 into the sink via ``paplay``; the recorder captures from the
-``visio-eye-dub.monitor`` source. The output .mp4 contains only the
+``kozgu-dub.monitor`` source. The output .mp4 contains only the
 Uzbek dubbing track.
 
 Windows: uses a DirectShow capture device chosen by the user as the
@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 IS_WINDOWS = sys.platform.startswith("win")
 
-SINK_NAME = "visio-eye-dub"
-SINK_DESC = "Visio_Eye_Dub_Mix"
+SINK_NAME = "kozgu-dub"
+SINK_DESC = "KOZGU_Dub_Mix"
 MONITOR_SOURCE = f"{SINK_NAME}.monitor"
 
 # Windows: substring match for known virtual-cable output devices,

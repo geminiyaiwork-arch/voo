@@ -297,7 +297,7 @@ class SettingsDialog(QDialog):
         o = self._settings.get("output")
 
         path_row = QHBoxLayout()
-        self.le_folder = QLineEdit(o.get("folder", str(Path.home() / "Videos" / "VisioEye")))
+        self.le_folder = QLineEdit(o.get("folder", str(Path.home() / "Videos" / "KOZGU")))
         browse = QPushButton(tr("settings.btn.browse"))
         browse.clicked.connect(self._pick_folder)
         path_row.addWidget(self.le_folder, 1)
@@ -313,7 +313,7 @@ class SettingsDialog(QDialog):
         for name, path in (
             ("Desktop", str(Path.home() / "Desktop")),
             ("Downloads", str(Path.home() / "Downloads")),
-            ("Videos", str(Path.home() / "Videos" / "VisioEye")),
+            ("Videos", str(Path.home() / "Videos" / "KOZGU")),
         ):
             btn = QPushButton(name)
             btn.setObjectName("ghost")
@@ -782,7 +782,7 @@ class SettingsDialog(QDialog):
         })
         self._settings.set_section("output", {
             "folder": self.le_folder.text().strip()
-                       or str(Path.home() / "Videos" / "VisioEye"),
+                       or str(Path.home() / "Videos" / "KOZGU"),
             "filename_template": self.le_template.text().strip()
                                   or "record_{Y}_{M}_{D}_{h}_{m}_{s}",
         })

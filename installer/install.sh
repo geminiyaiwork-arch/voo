@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Visio Eye - Linux installer
-# Installs the app to /opt/visio-eye and registers desktop entry.
+# KO'ZGU - Linux installer
+# Installs the app to /opt/kozgu and registers desktop entry.
 set -e
 
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-INSTALL_DIR="/opt/visio-eye"
-BIN_LINK="/usr/local/bin/visio-eye"
-DESKTOP_FILE="/usr/share/applications/visio-eye.desktop"
-ICON_TARGET="/usr/share/icons/hicolor/256x256/apps/visio-eye.png"
+INSTALL_DIR="/opt/kozgu"
+BIN_LINK="/usr/local/bin/kozgu"
+DESKTOP_FILE="/usr/share/applications/kozgu.desktop"
+ICON_TARGET="/usr/share/icons/hicolor/256x256/apps/kozgu.png"
 
 GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
@@ -59,15 +59,15 @@ copy_files() {
     mkdir -p "$INSTALL_DIR"
     cp -r "$PROJECT_DIR/src" "$INSTALL_DIR/"
     cp -r "$PROJECT_DIR/assets" "$INSTALL_DIR/"
-    cp "$PROJECT_DIR/visio-eye" "$INSTALL_DIR/visio-eye"
+    cp "$PROJECT_DIR/kozgu" "$INSTALL_DIR/kozgu"
     cp "$PROJECT_DIR/requirements.txt" "$INSTALL_DIR/"
-    chmod +x "$INSTALL_DIR/visio-eye"
+    chmod +x "$INSTALL_DIR/kozgu"
 }
 
 register_desktop() {
     log "Registering launcher and icon"
-    install -Dm755 "$PROJECT_DIR/visio-eye" "$INSTALL_DIR/visio-eye"
-    install -Dm644 "$PROJECT_DIR/installer/visio-eye.desktop" "$DESKTOP_FILE"
+    install -Dm755 "$PROJECT_DIR/kozgu" "$INSTALL_DIR/kozgu"
+    install -Dm644 "$PROJECT_DIR/installer/kozgu.desktop" "$DESKTOP_FILE"
 
     if [ -f "$PROJECT_DIR/assets/img/logo.png" ]; then
         install -Dm644 "$PROJECT_DIR/assets/img/logo.png" "$ICON_TARGET"
@@ -75,7 +75,7 @@ register_desktop() {
         install -Dm644 "$PROJECT_DIR/assets/img/author.png" "$ICON_TARGET"
     fi
 
-    ln -sf "$INSTALL_DIR/visio-eye" "$BIN_LINK"
+    ln -sf "$INSTALL_DIR/kozgu" "$BIN_LINK"
 
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database -q || true
@@ -92,8 +92,8 @@ main() {
     copy_files
     register_desktop
     log "Installation complete."
-    log "Launch with:   visio-eye"
-    log "Or find 'Visio Eye' in your application menu."
+    log "Launch with:   kozgu"
+    log "Or find 'KO'ZGU' in your application menu."
 }
 
 main "$@"

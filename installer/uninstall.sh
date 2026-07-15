@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove Visio Eye from this system.
+# Remove KO'ZGU from this system.
 set -e
 
 if [ "$EUID" -ne 0 ]; then
@@ -7,10 +7,10 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-rm -rf /opt/visio-eye /opt/voo-recorder
-rm -f /usr/local/bin/visio-eye /usr/local/bin/voo-recorder
-rm -f /usr/share/applications/visio-eye.desktop /usr/share/applications/voo-recorder.desktop
-rm -f /usr/share/icons/hicolor/256x256/apps/visio-eye.png
+rm -rf /opt/kozgu /opt/voo-recorder
+rm -f /usr/local/bin/kozgu /usr/local/bin/voo-recorder
+rm -f /usr/share/applications/kozgu.desktop /usr/share/applications/voo-recorder.desktop
+rm -f /usr/share/icons/hicolor/256x256/apps/kozgu.png
 rm -f /usr/share/icons/hicolor/256x256/apps/voo-recorder.png
 
 if command -v update-desktop-database >/dev/null 2>&1; then
@@ -20,5 +20,5 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q /usr/share/icons/hicolor || true
 fi
 
-echo "Visio Eye removed."
-echo "User settings remain in ~/.config/visio-eye/"
+echo "KO'ZGU removed."
+echo "User settings remain in ~/.config/kozgu/"

@@ -512,7 +512,7 @@ class WaylandPortalRecorder:
     @staticmethod
     def _stream_log_path() -> Path:
         cache = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
-        out = cache / "visio-eye"
+        out = cache / "kozgu"
         out.mkdir(parents=True, exist_ok=True)
         return out / "stream.log"
 
@@ -561,7 +561,7 @@ class WaylandPortalRecorder:
         log_path = self._stream_log_path()
         try:
             log_fh = open(log_path, "ab", buffering=0)
-            log_fh.write(b"\n\n===== Visio Eye streaming session =====\n")
+            log_fh.write(b"\n\n===== KO'ZGU streaming session =====\n")
             log_fh.write(("cmd: " + " ".join(cmd) + "\n").encode())
             log_fh.flush()
             self._stream_proc = subprocess.Popen(

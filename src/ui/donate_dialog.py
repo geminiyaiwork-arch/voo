@@ -29,7 +29,7 @@ BTC_NETWORK = "Bitcoin native SegWit (bech32)"
 class DonateDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Donate — Visio Eye")
+        self.setWindowTitle("Donate — KO'ZGU")
         self.setModal(True)
         self.setMinimumSize(520, 580)
         self.setStyleSheet("""
@@ -90,13 +90,13 @@ class DonateDialog(QDialog):
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(sub)
 
-        title = QLabel("☕  Donate to Visio Eye")
+        title = QLabel("☕  Donate to KO'ZGU")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(title)
 
         msg = QLabel(
-            "Visio Eye is free and open source.  If it helps you, "
+            "KO'ZGU is free and open source.  If it helps you, "
             "please consider a small donation — it keeps the project "
             "alive and fuels new features."
         )
