@@ -23,8 +23,15 @@ datas = [
     (str(ASSETS / "icons" / "usdt.svg"),        "assets/icons"),
     (str(ASSETS / "icons" / "btc.svg"),         "assets/icons"),
 ]
-# FFmpeg is NOT bundled — auto-downloaded on first launch via
-# ffmpeg_bootstrap.  Keeps the .app bundle small enough for UCMS.
+# Bundle FFmpeg + ffprobe fetched by build_macos.sh / GitHub Actions
+# from evermeet.cx.  This ships the .dmg fully self-contained so the
+# user doesn't need internet on first launch.  If bundling failed at
+# build time, ffmpeg_bootstrap downloads it lazily instead.
+ffmpeg_dir = PROJECT_DIR / "installer" / "macos" / "ffmpeg"
+if (ffmpeg_dir / "ffmpeg").exists():
+    datas.append((str(ffmpeg_dir / "ffmpeg"), "ffmpeg"))
+    if (ffmpeg_dir / "ffprobe").exists():
+        datas.append((str(ffmpeg_dir / "ffprobe"), "ffmpeg"))
 
 a = Analysis(
     [str(SRC / "main.py")],
@@ -81,12 +88,12 @@ app = BUNDLE(
     name="KO'ZGU.app",
     icon=str(ASSETS / "img" / "logo.png"),
     bundle_identifier="uz.kozgu.app",
-    version="1.8.0",
+    version="1.9.0",
     info_plist={
         "CFBundleName": "KO'ZGU",
         "CFBundleDisplayName": "KO'ZGU",
-        "CFBundleShortVersionString": "1.8.0",
-        "CFBundleVersion": "1.8.0",
+        "CFBundleShortVersionString": "1.9.0",
+        "CFBundleVersion": "1.9.0",
         "LSMinimumSystemVersion": "11.0",
         "NSHighResolutionCapable": True,
         # Permissions prompts that macOS shows on first launch:

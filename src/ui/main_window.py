@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from i18n import tr
-from overlays import CameraOverlay, HtmlOverlay, LogoOverlay
+from overlays import CameraOverlay, HtmlOverlay, LogoOverlay, WebOverlay
 from recorder import ScreenRecorder
 from recorder.screenshot import take_screenshot
 from settings import SettingsManager
@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self.cam_overlay: CameraOverlay | None = None
         self.logo_overlay: LogoOverlay | None = None
         self.html_overlay: HtmlOverlay | None = None
+        self.web_overlay: WebOverlay | None = None
         self._region: tuple[int, int, int, int] | None = None
         self._record_started_at: datetime.datetime | None = None
 
@@ -355,6 +356,10 @@ class MainWindow(QMainWindow):
             self._start_html_overlay()
         else:
             self._stop_html_overlay()
+        if self._settings.get("web_overlay", "enabled", False):
+            self._start_web_overlay()
+        else:
+            self._stop_web_overlay()
 
     def _toggle_camera(self, checked: bool) -> None:
         self._save_inline("camera", "enabled", checked)
@@ -436,6 +441,27 @@ class MainWindow(QMainWindow):
     def _stop_html_overlay(self) -> None:
         if self.html_overlay is not None:
             self.html_overlay.hide()
+
+    # ---------- Web URL overlay ----------
+    def _start_web_overlay(self) -> None:
+        w = self._settings.get("web_overlay") or {}
+        if not w.get("url", "").strip():
+            return
+        if self.web_overlay is None:
+            self.web_overlay = WebOverlay()
+        self.web_overlay.set_geometry(
+            int(w.get("x", 60)), int(w.get("y", 60)),
+            int(w.get("width", 640)), int(w.get("height", 400)),
+        )
+        self.web_overlay.set_transparent(bool(w.get("transparent_background", True)))
+        self.web_overlay.set_click_through(bool(w.get("click_through", True)))
+        self.web_overlay.set_zoom_pct(int(w.get("zoom", 100)))
+        self.web_overlay.set_url(w.get("url", ""))
+        self.web_overlay.show()
+
+    def _stop_web_overlay(self) -> None:
+        if self.web_overlay is not None:
+            self.web_overlay.hide()
 
     # ---------- recording ----------
     def _start_recording(self) -> None:
@@ -934,7 +960,10 @@ class MainWindow(QMainWindow):
         self._stop_camera_overlay()
         self._stop_logo_overlay()
         self._stop_html_overlay()
+        self._stop_web_overlay()
         if self.html_overlay is not None:
             self.html_overlay.close()
+        if self.web_overlay is not None:
+            self.web_overlay.close()
         self.hotkeys.stop()
         super().closeEvent(e)

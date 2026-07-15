@@ -203,6 +203,26 @@ TRANSLATIONS = {
             "KO'ZGU uses Chromium-based WebEngine — full HTML5 + CSS3 + "
             "JavaScript is supported. Leave the body background transparent "
             "to overlay on top of any application.",
+        # Web URL overlay (new)
+        "settings.tab.web": "Web Overlay",
+        "web.enable": "Show website overlay on screen (visible in recording + stream)",
+        "web.url": "Website URL",
+        "web.url_placeholder": "https://example.com",
+        "web.geometry": "Position and size",
+        "web.x": "X",
+        "web.y": "Y",
+        "web.width": "Width",
+        "web.height": "Height",
+        "web.transparent": "Transparent background (see-through where the page allows it)",
+        "web.click_through": "Click-through (mouse passes to apps behind)",
+        "web.zoom": "Zoom (%)",
+        "web.reload": "Reload page",
+        "web.hint":
+            "Opens the URL in a Chromium window on top of the screen. "
+            "The recorder captures the visible pixels, so the site appears "
+            "in both the recording and the live stream.  Transparent "
+            "background only works when the site itself has a transparent "
+            "body (e.g. widgets, overlays, streamer bots).",
     },
 
     # ============================================================
@@ -390,6 +410,26 @@ TRANSLATIONS = {
             "KO'ZGU Chromium asosida WebEngine ishlatadi — to'liq HTML5 + "
             "CSS3 + JavaScript qo'llab-quvvatlanadi. Body fonini shaffof "
             "qoldirsangiz overlay har qanday ilova ustida ko'rinadi.",
+        # Web URL overlay
+        "settings.tab.web": "Sayt overlay",
+        "web.enable": "Saytni ekranga overlay qilish (yozuv + strimda ko'rinadi)",
+        "web.url": "Sayt manzili",
+        "web.url_placeholder": "https://misol.uz",
+        "web.geometry": "Joylashuv va o'lcham",
+        "web.x": "X",
+        "web.y": "Y",
+        "web.width": "Eni",
+        "web.height": "Bo'yi",
+        "web.transparent": "Shaffof fon (sayt ruxsat bergan joyda ko'rinmas)",
+        "web.click_through": "Click-through (sichqoncha ortidagi ilovaga o'tadi)",
+        "web.zoom": "Kattalashtirish (%)",
+        "web.reload": "Sahifani qayta yuklash",
+        "web.hint":
+            "Sayt Chromium oynasida ekran ustida ochiladi. Yozuvchi "
+            "ko'rinadigan pikselni oladi, shuning uchun sayt yozuvda va "
+            "jonli strimda ham ko'rinadi.  Shaffof fon faqat sayt "
+            "o'zi transparent body ishlatganda ishlaydi (masalan widget, "
+            "overlay, streamer bot).",
     },
 
     # ============================================================
@@ -574,5 +614,25 @@ TRANSLATIONS = {
             "KO'ZGU использует Chromium WebEngine — поддерживаются HTML5 + "
             "CSS3 + JavaScript полностью. Оставьте фон body прозрачным, чтобы "
             "оверлей лежал поверх любого приложения.",
+        # Web URL overlay
+        "settings.tab.web": "Web Оверлей",
+        "web.enable": "Показывать сайт как оверлей (виден в записи и трансляции)",
+        "web.url": "URL сайта",
+        "web.url_placeholder": "https://пример.ru",
+        "web.geometry": "Позиция и размер",
+        "web.x": "X",
+        "web.y": "Y",
+        "web.width": "Ширина",
+        "web.height": "Высота",
+        "web.transparent": "Прозрачный фон (там, где сайт разрешает)",
+        "web.click_through": "Прозрачно для мыши (клики уходят под)",
+        "web.zoom": "Масштаб (%)",
+        "web.reload": "Обновить страницу",
+        "web.hint":
+            "Открывает URL в окне Chromium поверх экрана.  Запись "
+            "захватывает видимые пиксели, поэтому сайт появляется и в "
+            "видеозаписи, и в трансляции.  Прозрачный фон работает "
+            "только если у сайта прозрачное body (виджеты, оверлеи "
+            "стримеров и т.п.).",
     },
 }

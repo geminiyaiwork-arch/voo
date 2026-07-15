@@ -53,15 +53,32 @@ def ffmpeg_dir() -> Path:
 
 
 def _bundled_ffmpeg() -> Optional[Path]:
-    """FFmpeg shipped inside the PyInstaller bundle (unused now)."""
-    if not getattr(sys, "frozen", False):
-        return None
-    base = Path(getattr(sys, "_MEIPASS", "")) if hasattr(sys, "_MEIPASS") else None
-    if base is None:
-        return None
+    """FFmpeg shipped alongside the installed app.  Two locations are
+    checked because Inno Setup copies FFmpeg to ``{app}\\ffmpeg\\`` while
+    PyInstaller's ``datas`` copies it under ``sys._MEIPASS/ffmpeg/``.
+    We look at both so it works whichever bundling channel populated it.
+    """
     exe = "ffmpeg.exe" if IS_WINDOWS else "ffmpeg"
-    p = base / "ffmpeg" / exe
-    return p if p.exists() else None
+    # 1) PyInstaller resource dir (sys._MEIPASS)
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            p = Path(meipass) / "ffmpeg" / exe
+            if p.exists():
+                return p
+    # 2) Next to the executable — Inno Setup on Windows drops FFmpeg
+    #    at {app}\ffmpeg\ffmpeg.exe.  The .app bundle on macOS puts
+    #    resources at .../Contents/Resources/ffmpeg/ffmpeg.
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        for candidate in (
+            exe_dir / "ffmpeg" / exe,
+            exe_dir.parent / "Resources" / "ffmpeg" / exe,   # macOS .app
+            exe_dir / "_internal" / "ffmpeg" / exe,          # PyInstaller onedir
+        ):
+            if candidate.exists():
+                return candidate
+    return None
 
 
 def ffmpeg_binary() -> Optional[Path]:

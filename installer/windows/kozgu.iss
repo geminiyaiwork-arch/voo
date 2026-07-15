@@ -8,7 +8,7 @@
 ; ============================================================
 
 #define MyAppName "KO'ZGU"
-#define MyAppVersion "1.8.0"
+#define MyAppVersion "1.9.0"
 #define MyAppPublisher "Elyorbek"
 #define MyAppExeName "kozgu.exe"
 #define MyAppURL "https://t.me/visio_eye"
@@ -53,10 +53,11 @@ Name: "quicklaunchicon"; Description: "Create a &Quick Launch icon"; \
 ; PyInstaller produces a folder dist\kozgu\ — copy the entire tree.
 Source: "..\..\dist\kozgu\*"; DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
-; FFmpeg is NOT bundled anymore — the app downloads a static build on
-; first launch and caches it in %APPDATA%\KOZGU\ffmpeg\.  This keeps
-; the installer small enough to upload through UCMS.UZ (nginx client
-; max body size).
+; FFmpeg + ffprobe — bundled by build_windows.bat from gyan.dev,
+; installed to {app}\ffmpeg\.  The app adds this dir to PATH via
+; ffmpeg_bootstrap.ffmpeg_binary() lookup.
+Source: "ffmpeg\ffmpeg.exe"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "ffmpeg\ffprobe.exe"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion skipifsourcedoesntexist
 ; Visual C++ 2015-2022 Redistributable (x64) — also bundled by
 ; build_windows.bat so the installer works on offline machines.
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; \

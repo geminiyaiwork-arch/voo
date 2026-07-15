@@ -2,7 +2,7 @@ name: Build Windows installer
 
 # Trigger:
 #   - Every push to main
-#   - Every tag like v1.8.0  (creates a GitHub Release with the .exe attached)
+#   - Every tag like v1.9.0  (creates a GitHub Release with the .exe attached)
 #   - Manually from the Actions tab
 on:
   push:
@@ -38,9 +38,17 @@ jobs:
         run: |
           python -c "from PIL import Image; im=Image.open('assets/img/logo.png').convert('RGBA'); im.save('assets/img/logo.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
-      # FFmpeg is no longer bundled — the app fetches it on first launch
-      # via ffmpeg_bootstrap, which keeps the installer small enough to
-      # pass UCMS.UZ upload limits.
+      - name: Download FFmpeg static build (bundled into installer)
+        run: |
+          New-Item -ItemType Directory -Force -Path installer\windows\ffmpeg | Out-Null
+          Invoke-WebRequest 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile installer\windows\ffmpeg.zip
+          Expand-Archive installer\windows\ffmpeg.zip -DestinationPath installer\windows\ffmpeg_tmp -Force
+          $ff = Get-ChildItem installer\windows\ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          $fp = Get-ChildItem installer\windows\ffmpeg_tmp -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          Copy-Item $ff.FullName installer\windows\ffmpeg\ffmpeg.exe
+          Copy-Item $fp.FullName installer\windows\ffmpeg\ffprobe.exe
+          Remove-Item installer\windows\ffmpeg.zip
+          Remove-Item installer\windows\ffmpeg_tmp -Recurse -Force
 
       - name: Download VC++ 2015-2022 Redistributable
         run: |

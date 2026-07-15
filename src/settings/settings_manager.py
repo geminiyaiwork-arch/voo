@@ -114,6 +114,17 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "keyframe_seconds": 2,
         "audio_kbps": 160,
     },
+    "web_overlay": {
+        "enabled": False,
+        "url": "",
+        "x": 60,
+        "y": 60,
+        "width": 640,
+        "height": 400,
+        "zoom": 100,
+        "transparent_background": True,
+        "click_through": True,
+    },
     "html_overlay": {
         "enabled": False,
         "html": (

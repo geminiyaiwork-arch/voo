@@ -78,6 +78,7 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self._build_dubbing(), tr("settings.tab.dubbing"))
         self.tabs.addTab(self._build_streaming(), tr("settings.tab.streaming"))
         self.tabs.addTab(self._build_html(), tr("settings.tab.html"))
+        self.tabs.addTab(self._build_web(), tr("settings.tab.web"))
         root.addWidget(self.tabs, 1)
 
         bottom = QHBoxLayout()
@@ -731,6 +732,56 @@ class SettingsDialog(QDialog):
         layout.addWidget(hint)
         return w
 
+    # ---------- Web URL Overlay ----------
+    def _build_web(self) -> QWidget:
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        wc = self._settings.get("web_overlay") or {}
+
+        self.chk_web = QCheckBox(tr("web.enable"))
+        self.chk_web.setChecked(bool(wc.get("enabled", False)))
+        layout.addWidget(self.chk_web)
+
+        url_box = QGroupBox(tr("web.url"))
+        url_form = QFormLayout(url_box)
+        self.le_web_url = QLineEdit(wc.get("url", ""))
+        self.le_web_url.setPlaceholderText(tr("web.url_placeholder"))
+        url_form.addRow(tr("web.url"), self.le_web_url)
+
+        self.sp_web_zoom = self._spin(25, 500, int(wc.get("zoom", 100)))
+        self.sp_web_zoom.setSuffix(" %")
+        url_form.addRow(tr("web.zoom"), self.sp_web_zoom)
+        layout.addWidget(url_box)
+
+        geom_box = QGroupBox(tr("web.geometry"))
+        geom_form = QFormLayout(geom_box)
+        self.sp_web_x = self._spin(0, 7680, int(wc.get("x", 60)))
+        self.sp_web_y = self._spin(0, 4320, int(wc.get("y", 60)))
+        self.sp_web_w = self._spin(80, 7680, int(wc.get("width", 640)))
+        self.sp_web_h = self._spin(60, 4320, int(wc.get("height", 400)))
+        geom_form.addRow(tr("web.x"), self.sp_web_x)
+        geom_form.addRow(tr("web.y"), self.sp_web_y)
+        geom_form.addRow(tr("web.width"), self.sp_web_w)
+        geom_form.addRow(tr("web.height"), self.sp_web_h)
+        layout.addWidget(geom_box)
+
+        opt_box = QGroupBox(tr("html.behaviour"))
+        opt_form = QFormLayout(opt_box)
+        self.chk_web_click = QCheckBox(tr("web.click_through"))
+        self.chk_web_click.setChecked(bool(wc.get("click_through", True)))
+        self.chk_web_bg = QCheckBox(tr("web.transparent"))
+        self.chk_web_bg.setChecked(bool(wc.get("transparent_background", True)))
+        opt_form.addRow("", self.chk_web_click)
+        opt_form.addRow("", self.chk_web_bg)
+        layout.addWidget(opt_box)
+
+        hint = QLabel(tr("web.hint"))
+        hint.setStyleSheet("color:#64748b;font-size:11px;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        layout.addStretch(1)
+        return w
+
     # ---------- helpers ----------
     @staticmethod
     def _spin(lo: int, hi: int, val: int) -> QSpinBox:
@@ -883,6 +934,17 @@ class SettingsDialog(QDialog):
             "height": int(self.sp_html_h.value()),
             "click_through": self.chk_html_click.isChecked(),
             "transparent_background": self.chk_html_bg.isChecked(),
+        })
+        self._settings.set_section("web_overlay", {
+            "enabled": self.chk_web.isChecked(),
+            "url": self.le_web_url.text().strip(),
+            "x": int(self.sp_web_x.value()),
+            "y": int(self.sp_web_y.value()),
+            "width": int(self.sp_web_w.value()),
+            "height": int(self.sp_web_h.value()),
+            "zoom": int(self.sp_web_zoom.value()),
+            "click_through": self.chk_web_click.isChecked(),
+            "transparent_background": self.chk_web_bg.isChecked(),
         })
         self._settings.save()
         if new_lang != getattr(self, "_initial_language", new_lang):

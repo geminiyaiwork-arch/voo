@@ -26,9 +26,17 @@ datas = [
     (str(ASSETS / "icons" / "usdt.svg"),        "assets/icons"),
     (str(ASSETS / "icons" / "btc.svg"),         "assets/icons"),
 ]
-# FFmpeg is intentionally NOT bundled — it adds ~140 MB and the app
-# now auto-downloads a static build on first launch via ffmpeg_bootstrap.
-# This keeps the installer under the UCMS upload limit.
+# Bundle FFmpeg + ffprobe (downloaded by build_windows.bat from
+# gyan.dev at build time).  This makes the installer fully self-
+# contained so end-users do NOT need internet on first launch.
+ffmpeg_dir = PROJECT_DIR / "installer" / "windows" / "ffmpeg"
+if (ffmpeg_dir / "ffmpeg.exe").exists():
+    datas.append((str(ffmpeg_dir / "ffmpeg.exe"), "ffmpeg"))
+    if (ffmpeg_dir / "ffprobe.exe").exists():
+        datas.append((str(ffmpeg_dir / "ffprobe.exe"), "ffmpeg"))
+# If bundling failed at build time, the ffmpeg_bootstrap fallback
+# still downloads FFmpeg on the first Record — never leaves the user
+# with a broken app.
 
 a = Analysis(
     [str(SRC / "main.py")],
