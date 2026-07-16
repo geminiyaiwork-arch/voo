@@ -4,7 +4,7 @@
 set -e
 
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-VERSION="1.9.20"
+VERSION="1.9.21"
 PKG_NAME="kozgu_${VERSION}_all"
 STAGING="$PROJECT_DIR/build/$PKG_NAME"
 DIST_DIR="$PROJECT_DIR/dist"

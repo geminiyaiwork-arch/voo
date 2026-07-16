@@ -356,39 +356,29 @@ class WaylandPortalRecorder:
         muxer_tokens = muxer_map.get(container, muxer_map["mp4"])
 
         parts: list[str] = [
-            # NOTE: we intentionally do NOT pass `-q` here.  When
-            # gst-launch fails to link (e.g. missing element, bad
-            # caps, portal fd revoked, encoder crash) `-q` swallowed
-            # the "WARN"/"ERROR" lines and left the user staring at
-            # an empty gst.log.  Default verbosity is fine — it goes
-            # straight to a file, no pipe pressure.
-            # keepalive-time=33 (30 Hz): if the compositor stops
-            # sending new frames (static screen, no damage events),
-            # pipewiresrc re-emits its last buffer every 33 ms so the
-            # rest of the pipeline keeps advancing.  Without this,
-            # a paused desktop = zero buffers = pipewireclock never
-            # ticks = mp4mux/flvmux aggregators block forever and
-            # BOTH the file and the RTMP stream stay empty.  Common
-            # trap on GNOME/KDE Wayland where portal ScreenCast is
-            # damage-driven by default.
             "gst-launch-1.0", "-e",
-            # always-copy=true forces pipewiresrc to hand us plain
-            # CPU-side buffers instead of DMA-BUF / GL memory.  On
-            # Wayland compositors that offer zero-copy DMA-BUF export
-            # (Mutter, KWin, wlroots), the raw caps arrive with GPU
-            # memory descriptors that videoconvert can't consume, and
-            # the next element (x264enc) then gets caps it "rejects"
-            # — actually a caps negotiation failure a few hops
-            # upstream that surfaces as an encoder set_format warn
-            # and pipeline dies with 'not-negotiated (-4)'.
+            # keepalive-time=33 (30 Hz): re-emit last buffer if the
+            # compositor stops sending damage events. Fixes the
+            # static-screen-stall class of failures on GNOME/KDE.
+            #
+            # always-copy=true wasn't enough on this NVIDIA + Wayland
+            # box — pipewire NEGOTIATES DMA-BUF caps regardless of
+            # always-copy, and a plain `videoconvert !
+            # video/x-raw,format=I420` filter refused them upstream:
+            #     WARN pipewiresrc: No supported formats found —
+            #     This element does not have formats in common with
+            #     the peer.
+            # Drop the explicit format cap and use `videoconvertscale`
+            # (combined convert + scale) whose sink template accepts
+            # video/x-raw(ANY) — DMA-BUF included.  The encoder's
+            # own capsfilter downstream still pins format=I420 for
+            # openh264enc, and videoconvertscale converts on the way.
             "pipewiresrc", f"path={node_id}",
             "do-timestamp=true",
             "keepalive-time=33",
             "always-copy=true",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
-            "!", "videoconvert",
-            "!", "video/x-raw,format=I420",
         ]
 
         # ---- Region crop ----
@@ -420,24 +410,19 @@ class WaylandPortalRecorder:
         # =true` extra props; plain `videorate` re-timestamps
         # monotonically and doesn't confuse downstream muxers.
         target_fps = max(1, int(fps))
-        # NOTE: the second `videoconvert` before the encoder is not
-        # cosmetic — the upstream chain (pipewiresrc → videoconvert →
-        # videoscale → videorate) leaks a `max-framerate=<int>/65536`
-        # field that x264enc's set_format() rejects, so setcaps failed
-        # with 'rejected caps ... framerate=30/1'.  videoconvert
-        # renegotiates its downstream caps and strips fields not
-        # requested by the following capsfilter, so x264enc sees a
-        # clean `video/x-raw,format=I420,framerate=30/1,...`.
+        # videoconvertscale = videoconvert + videoscale in one
+        # element with a video/x-raw(ANY) sink template — it accepts
+        # DMA_DRM / DMABuf from pipewiresrc AND produces the plain
+        # video/x-raw the encoder wants, all in one negotiation.
+        # videorate afterwards pins the framerate and re-emits
+        # monotonic timestamps so aggregators (mp4mux, mpegtsmux)
+        # can align pads without stalling.
         parts += [
-            "!", "videoscale", "method=bilinear", "add-borders=false",
-            "!", f"video/x-raw,width={target_width},height={target_height},"
-                  "pixel-aspect-ratio=1/1",
+            "!", "videoconvertscale",
+            "!", (f"video/x-raw,format=I420,width={target_width},"
+                  f"height={target_height},pixel-aspect-ratio=1/1"),
             "!", "videorate",
             "!", f"video/x-raw,framerate={target_fps}/1",
-            "!", "videoconvert",
-            "!", (f"video/x-raw,format=I420,width={target_width},"
-                  f"height={target_height},framerate={target_fps}/1,"
-                  "pixel-aspect-ratio=1/1,interlace-mode=progressive"),
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", *v_enc,
