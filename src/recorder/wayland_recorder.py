@@ -376,10 +376,18 @@ class WaylandPortalRecorder:
         # be 2880x1800 / 3840x2400 — way too heavy for software x264.
         # We bound the output at the user's quality setting (1080p
         # default) which keeps CPU manageable.
+        # `videorate` + a `framerate=fps/1` cap AFTER videoscale is
+        # critical for streaming: the compositor sometimes reports 144
+        # tbr / 288 tbn which Telegram/YouTube RTMPS servers drop
+        # ("stream stalled" side of "efirga uzatmayapdi").  We drop
+        # duplicates so the encoder sees the target fps exactly.
+        target_fps = max(1, int(fps))
         parts += [
             "!", "videoscale", "method=bilinear", "add-borders=false",
             "!", f"video/x-raw,width={target_width},height={target_height},"
                   "pixel-aspect-ratio=1/1",
+            "!", "videorate", "drop-only=true", "skip-to-first=true",
+            "!", f"video/x-raw,framerate={target_fps}/1",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", *v_enc,
@@ -690,22 +698,44 @@ class WaylandPortalRecorder:
                 "-f", "tee", outputs,
             ]
         log_path = self._stream_log_path()
+        # Wrap ffmpeg in a shell retry loop so a transient RTMP(S)
+        # "Connection timed out" (very common on Uzbek networks pushing
+        # to Telegram DCs) doesn't kill the broadcast forever. Bash
+        # keeps the pipe stdin open across ffmpeg retries; the kernel
+        # pipe buffer absorbs the 1-2 s gap so gst never SIGPIPEs.
+        import shlex
+        ff_quoted = " ".join(shlex.quote(a) for a in cmd)
+        retry_script = (
+            'trap "kill -INT $pid 2>/dev/null; wait $pid; exit 0" INT TERM;'
+            'i=0;'
+            'while [ $i -lt 20 ]; do '
+            f'  {ff_quoted} & pid=$!;'
+            '  wait $pid; rc=$?;'
+            '  [ $rc -eq 0 ] && exit 0;'
+            '  echo "[kozgu-relay] ffmpeg exit rc=$rc, retry $((i+1))/20 in 2s" 1>&2;'
+            '  i=$((i+1));'
+            '  sleep 2;'
+            'done; exit 1'
+        )
+        wrapped_cmd = ["sh", "-c", retry_script]
         try:
             log_fh = open(log_path, "ab", buffering=0)
             log_fh.write(b"\n\n===== KO'ZGU streaming session =====\n")
             log_fh.write(("cmd: " + " ".join(cmd) + "\n").encode())
+            log_fh.write(b"(wrapped in bash retry x20)\n")
             log_fh.flush()
             self._stream_proc = subprocess.Popen(
-                cmd,
-                stdin=input_fd,                 # GStreamer pipe → FFmpeg stdin
+                wrapped_cmd,
+                stdin=input_fd,                 # GStreamer pipe → sh → ffmpeg
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
                 preexec_fn=os.setsid,
             )
-            # We've passed the fd to the child; close ours. (Respawning
-            # the relay is not viable — gst holds the pipe write end
-            # and dies of SIGPIPE the instant the reader vanishes, so
-            # keeping the fd around would be a leak.)
+            # We've passed the fd to the child; close ours. sh inherits
+            # it as fd 0 and passes it to each ffmpeg attempt via
+            # inheritance.  If a relay attempt fails, sh's fd 0 is
+            # still open so gst's write end sees a valid reader and
+            # doesn't SIGPIPE during the 2s retry gap.
             os.close(input_fd)
             self._stream_log = str(log_path)
             return True
