@@ -50,19 +50,19 @@ jobs:
       - name: Build .dmg with create-dmg
         run: |
           create-dmg \
-            --volname "KO'ZGU 1.9.15" \
+            --volname "KO'ZGU 1.9.16" \
             --window-pos 200 120 \
             --window-size 600 380 \
             --icon-size 96 \
             --icon "KO'ZGU.app" 150 180 \
             --hide-extension "KO'ZGU.app" \
             --app-drop-link 450 180 \
-            "dist/KOZGU-1.9.15.dmg" \
+            "dist/KOZGU-1.9.16.dmg" \
             "dist/KO'ZGU.app" \
-            || hdiutil create -volname "KO'ZGU 1.9.15" \
+            || hdiutil create -volname "KO'ZGU 1.9.16" \
                               -srcfolder "dist/KO'ZGU.app" \
                               -ov -format UDZO \
-                              "dist/KOZGU-1.9.15.dmg"
+                              "dist/KOZGU-1.9.16.dmg"
 
       - name: Upload .dmg artifact
         uses: actions/upload-artifact@v4

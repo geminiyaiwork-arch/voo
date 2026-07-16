@@ -392,26 +392,22 @@ class WaylandPortalRecorder:
         # be 2880x1800 / 3840x2400 — way too heavy for software x264.
         # We bound the output at the user's quality setting (1080p
         # default) which keeps CPU manageable.
-        # NOTE: 1.9.3-1.9.6 inserted a 'videorate ! framerate=fps/1'
-        # cap here to normalise 144-tbr compositor output down to 30
-        # fps for RTMP.  But when combined with `pipewiresrc
-        # do-timestamp=true` upstream (which the plugin REQUIRES to
-        # stamp buffers into pipeline running time), videorate's own
-        # re-timestamping produced backwards DTS bursts:
-        #   flvmux WARN: Got backwards dts! (0.033s < 0.066s)
-        # flvmux then dropped every affected buffer, gst produced no
-        # data on the RTMP fdsink, and the mp4 filesink also wrote
-        # zero bytes because mp4mux was blocked waiting on the audio
-        # aggregator.  Result: both recording and streaming empty.
-        # Revert to the plain videoscale chain — the compositor's
-        # native rate reaches the encoder unchanged.  RTMP endpoints
-        # accept 60-144 fps in practice; when they don't, we should
-        # solve it downstream (relay re-encode) instead of touching
-        # the timestamped pipewire buffers.
+        # Pipewire delivers framerate=0/1 (variable/undefined) — the
+        # compositor lets the pw negotiation float.  x264enc rejects
+        # that caps with 'rejected caps ... framerate=(fraction)0/1',
+        # so we MUST pin an integer rate here.
+        # `videorate` converts variable-rate input to a fixed rate
+        # by dropping / duplicating frames as needed. The 1.9.3-1.9.7
+        # backwards-DTS bug came from `drop-only=true skip-to-first
+        # =true` extra props; plain `videorate` re-timestamps
+        # monotonically and doesn't confuse downstream muxers.
+        target_fps = max(1, int(fps))
         parts += [
             "!", "videoscale", "method=bilinear", "add-borders=false",
             "!", f"video/x-raw,width={target_width},height={target_height},"
                   "pixel-aspect-ratio=1/1",
+            "!", "videorate",
+            "!", f"video/x-raw,framerate={target_fps}/1",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", *v_enc,
