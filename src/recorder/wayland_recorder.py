@@ -421,16 +421,17 @@ class WaylandPortalRecorder:
         # audio branch can request a sink pad on it.
         file_muxer = [muxer_tokens[0], "name=mux"] + list(muxer_tokens[1:])
         if streaming:
-            # tee encoded H.264 into (1) the file muxer and (2) a raw
-            # fdsink.  Version 1.9.12 wrapped the RTMP leg in flvmux,
-            # which is an aggregator — when the pipeline started with a
-            # partially-idle compositor the flvmux side would silently
-            # emit ZERO bytes even though mp4mux on the same tee wrote
-            # 140 KB.  The relay ffmpeg then saw a permanently-empty
-            # pipe and gave up with EOF.  Bypass flvmux entirely: push
-            # raw AnnexB H.264 through fdsink, and let the relay ffmpeg
-            # re-mux to FLV on the RTMP side — that ffmpeg is going to
-            # touch every byte anyway, so the extra work is free.
+            # tee encoded H.264 into (1) the file muxer and (2) an
+            # mpegtsmux → fdsink chain (for the RTMP relay).
+            # v1.9.14 sent raw AnnexB H.264 over the pipe. ffmpeg
+            # correctly saw "Video: h264, 30 fps" but couldn't parse
+            # SPS in time ("unspecified size") because SPS lives once
+            # per IDR (every 2 s at key-int-max=60) and h264parse
+            # config-interval=-1 doesn't repeat it inside a GOP.
+            # MPEG-TS solves that: 188-byte transport packets carry
+            # PAT/PMT + PES headers so ffmpeg identifies the stream
+            # from the very first packet, and it's the canonical
+            # streaming container that never has aggregator surprises.
             parts += [
                 "!", "tee", "name=vtee",
                 "vtee.", "!", "queue",
@@ -438,6 +439,7 @@ class WaylandPortalRecorder:
                 "!", "filesink", f"location={output_path}",
                 "vtee.", "!", "queue", "max-size-buffers=2",
                 "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
+                "!", "mpegtsmux", "alignment=7",
                 "!", "fdsink", "fd=__STREAM_FD__", "sync=false",
             ]
         else:
@@ -547,7 +549,6 @@ class WaylandPortalRecorder:
                 stream_urls=stream_urls,
                 input_fd=stream_read_fd,
                 audio_source=cfg.audio_source,
-                fps=int(getattr(cfg, "fps", 30) or 30),
             )
             if not started:
                 # FFmpeg failed to launch: drop the streaming leg so
@@ -732,8 +733,7 @@ class WaylandPortalRecorder:
 
     def _start_streaming_bridge(self, stream_urls: list[str],
                                  input_fd: int,
-                                 audio_source: str = "both",
-                                 fps: int = 30) -> bool:
+                                 audio_source: str = "both") -> bool:
         """Spawn an FFmpeg subprocess that reads the GStreamer FLV
         stream from a pipe FD and forwards it to every RTMP/RTMPS
         destination via the tee muxer (one re-mux, many outputs).
@@ -753,19 +753,17 @@ class WaylandPortalRecorder:
         # `-probesize 32 -analyzeduration 0` also caused the AAC track
         # to be mis-detected on ~5% of piped FLVs → we now use 1 MB /
         # 1 s which still starts in <200 ms but never confuses the demuxer.
-        # Input is now RAW AnnexB H.264 straight out of gst's fdsink
-        # (no flvmux upstream — that was silently emitting 0 bytes on
-        # partially-idle Wayland desktops).  ffmpeg identifies raw H.264
-        # via '-f h264'.  probesize/analyzeduration bumped to 5 s so
-        # we survive the ~1.5-2 s portal handshake + first-buffer wait.
-        video_framerate = str(int(fps) if fps > 0 else 30)
+        # Input is MPEG-TS from gst-side mpegtsmux (see _build_pipeline).
+        # MPEG-TS carries PAT/PMT so ffmpeg identifies the H.264 stream
+        # (width/height from SPS) from the first ~10 KB, no waiting for
+        # the next IDR.  probesize/analyzeduration stay at 5 s to
+        # tolerate the portal handshake before first byte.
         common_input = [
             "-fflags", "+nobuffer+genpts",
             "-flags", "+low_delay",
             "-probesize", "5000000",
             "-analyzeduration", "5000000",
-            "-f", "h264",
-            "-framerate", video_framerate,
+            "-f", "mpegts",
             "-i", "pipe:0",
         ]
         if len(stream_urls) == 1:
