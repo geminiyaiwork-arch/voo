@@ -348,7 +348,13 @@ class WaylandPortalRecorder:
         muxer_tokens = muxer_map.get(container, muxer_map["mp4"])
 
         parts: list[str] = [
-            "gst-launch-1.0", "-q", "-e",
+            # NOTE: we intentionally do NOT pass `-q` here.  When
+            # gst-launch fails to link (e.g. missing element, bad
+            # caps, portal fd revoked, encoder crash) `-q` swallowed
+            # the "WARN"/"ERROR" lines and left the user staring at
+            # an empty gst.log.  Default verbosity is fine — it goes
+            # straight to a file, no pipe pressure.
+            "gst-launch-1.0", "-e",
             "pipewiresrc", f"path={node_id}",
             "do-timestamp=true",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
@@ -566,20 +572,39 @@ class WaylandPortalRecorder:
         pass_fds = [pipewire_fd]
         if stream_write_fd >= 0:
             pass_fds.append(stream_write_fd)
+        # Route gst-launch stderr to a persistent log file (tee'd so
+        # start-up failures like "no element pipewiresrc" or portal FD
+        # revocation are visible to the user immediately, not only in
+        # the drainer buffer that stop() prints once at the very end).
+        gst_log_path = self._gst_log_path()
+        try:
+            gst_log_fh = open(gst_log_path, "ab", buffering=0)
+            gst_log_fh.write(b"\n\n===== KO'ZGU gst session =====\n")
+            gst_log_fh.write(("cmd: " + " ".join(new_args) + "\n").encode())
+            gst_log_fh.flush()
+        except OSError:
+            gst_log_fh = None
         self._proc = subprocess.Popen(
             new_args,
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=gst_log_fh if gst_log_fh is not None else subprocess.PIPE,
             preexec_fn=os.setsid,
             env=env,
             pass_fds=tuple(pass_fds),
             close_fds=True,
         )
-        # Drain gst-launch stderr — same reason as ffmpeg: pipe buffer
-        # fills after a few minutes of progress output and the encode
-        # freezes.
-        self._proc_drainer = StderrDrainer(self._proc)
+        # Only wire the drainer when we DID have to fall back to PIPE
+        # (gst_log_fh open failed) — with a real file handle stderr
+        # goes straight to disk and never blocks.
+        self._proc_drainer = (
+            StderrDrainer(self._proc) if gst_log_fh is None else None
+        )
+        if gst_log_fh is not None:
+            try:
+                gst_log_fh.close()          # gst inherits its own copy
+            except OSError:
+                pass
         # Close our copies of the fds we handed to the child — gst owns
         # them now.  Not closing pipewire_fd here leaks one socket per
         # recording session.
@@ -600,6 +625,13 @@ class WaylandPortalRecorder:
         out = cache / "kozgu"
         out.mkdir(parents=True, exist_ok=True)
         return out / "stream.log"
+
+    @staticmethod
+    def _gst_log_path() -> Path:
+        cache = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
+        out = cache / "kozgu"
+        out.mkdir(parents=True, exist_ok=True)
+        return out / "gst.log"
 
     @staticmethod
     def _resolve_record_bitrate(preset: str | None,
@@ -818,7 +850,20 @@ class WaylandPortalRecorder:
                 except subprocess.TimeoutExpired:
                     os.killpg(os.getpgid(self._proc.pid), signal.SIGKILL)
                     self._proc.wait()
-            err = self._proc_drainer.text() if self._proc_drainer else ""
+            # If the drainer isn't wired (stderr went to disk), read
+            # the tail of the gst log as the "error" for the UI.
+            if self._proc_drainer:
+                err = self._proc_drainer.text()
+            else:
+                try:
+                    with open(self._gst_log_path(), "rb") as fh:
+                        try:
+                            fh.seek(-4096, 2)     # last 4 KB
+                        except OSError:
+                            fh.seek(0)
+                        err = fh.read().decode("utf-8", errors="ignore")
+                except OSError:
+                    err = ""
             code = self._proc.returncode or 0
 
             # Stop the streaming subprocess too
