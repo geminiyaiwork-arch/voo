@@ -618,7 +618,16 @@ class WaylandPortalRecorder:
         # and other diagnostic prints go to stdout, not stderr.
         # GST_DEBUG=*:3 = WARNING level, keeps the log usable without
         # drowning in trace messages.
-        env.setdefault("GST_DEBUG", "*:3")
+        # Per-element diagnostic verbosity so we can see whether
+        # pipewiresrc is actually producing buffers.  If the log
+        # shows zero "buffered / pushed" lines from pipewiresrc, the
+        # portal source is idle (nothing to record) and keepalive
+        # can't help — the compositor never sent a first frame.
+        env.setdefault(
+            "GST_DEBUG",
+            "pipewiresrc:5,gst_pipewire_src:5,mp4mux:4,flvmux:4,"
+            "fdsink:4,x264enc:4,*:3",
+        )
         env.setdefault("GST_DEBUG_NO_COLOR", "1")
         wrapped_args = ["stdbuf", "-oL", "-eL", *new_args] \
             if shutil.which("stdbuf") else new_args
