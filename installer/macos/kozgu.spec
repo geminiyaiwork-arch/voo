@@ -88,12 +88,12 @@ app = BUNDLE(
     name="KO'ZGU.app",
     icon=str(ASSETS / "img" / "logo.png"),
     bundle_identifier="uz.kozgu.app",
-    version="1.9.5",
+    version="1.9.6",
     info_plist={
         "CFBundleName": "KO'ZGU",
         "CFBundleDisplayName": "KO'ZGU",
-        "CFBundleShortVersionString": "1.9.5",
-        "CFBundleVersion": "1.9.5",
+        "CFBundleShortVersionString": "1.9.6",
+        "CFBundleVersion": "1.9.6",
         "LSMinimumSystemVersion": "11.0",
         "NSHighResolutionCapable": True,
         # Permissions prompts that macOS shows on first launch:

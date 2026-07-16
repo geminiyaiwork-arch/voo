@@ -551,7 +551,12 @@ class WaylandPortalRecorder:
         )
 
         env = os.environ.copy()
-        env["PIPEWIRE_REMOTE"] = "1"
+        # Do NOT set PIPEWIRE_REMOTE — it names the PipeWire socket
+        # ("pipewire-0" by default), not an fd number.  We used to set
+        # it to "1" here which caused libpipewire to try to open a
+        # socket called "1", which then failed the loop-poll
+        # assertion inside SPA and SIGABRT'd gst-launch silently.
+        env.pop("PIPEWIRE_REMOTE", None)
 
         # Substitute the placeholder for the streaming FD.
         if stream_write_fd >= 0:
@@ -584,11 +589,23 @@ class WaylandPortalRecorder:
             gst_log_fh.flush()
         except OSError:
             gst_log_fh = None
+        # Force line-buffered stdio so any error / SPA assertion
+        # message flushes to the log file immediately (block-buffered
+        # stderr can lose the last chunk on abort()).  Merge stdout
+        # into the log too — "Setting pipeline to PAUSED / PLAYING"
+        # and other diagnostic prints go to stdout, not stderr.
+        # GST_DEBUG=*:3 = WARNING level, keeps the log usable without
+        # drowning in trace messages.
+        env.setdefault("GST_DEBUG", "*:3")
+        env.setdefault("GST_DEBUG_NO_COLOR", "1")
+        wrapped_args = ["stdbuf", "-oL", "-eL", *new_args] \
+            if shutil.which("stdbuf") else new_args
         self._proc = subprocess.Popen(
-            new_args,
+            wrapped_args,
             stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=gst_log_fh if gst_log_fh is not None else subprocess.PIPE,
+            stdout=gst_log_fh if gst_log_fh is not None else subprocess.DEVNULL,
+            stderr=(subprocess.STDOUT if gst_log_fh is not None
+                    else subprocess.PIPE),
             preexec_fn=os.setsid,
             env=env,
             pass_fds=tuple(pass_fds),
