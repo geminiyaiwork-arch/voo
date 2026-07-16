@@ -16,7 +16,7 @@ _setup_path()
 
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPalette, QColor
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from i18n import set_language
@@ -36,6 +36,36 @@ def main() -> int:
     app.setApplicationDisplayName("KO'ZGU")
     app.setOrganizationName("KO'ZGU")
     app.setStyle("Fusion")
+
+    # Force a LIGHT palette across the whole app so QComboBox / QMenu
+    # popups (which are top-level windows Qt creates outside the parent
+    # stylesheet's scope) don't inherit the OS dark palette.  Without
+    # this the language dropdown paints its popup black even though the
+    # rest of Settings is white.
+    pal = QPalette()
+    pal.setColor(QPalette.ColorRole.Window,          QColor("#f8fafc"))
+    pal.setColor(QPalette.ColorRole.WindowText,      QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.Base,            QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.AlternateBase,   QColor("#f1f5f9"))
+    pal.setColor(QPalette.ColorRole.ToolTipBase,     QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.ToolTipText,     QColor("#f8fafc"))
+    pal.setColor(QPalette.ColorRole.Text,            QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.Button,          QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.ButtonText,      QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.BrightText,      QColor("#ef4444"))
+    pal.setColor(QPalette.ColorRole.Link,            QColor("#2563eb"))
+    pal.setColor(QPalette.ColorRole.Highlight,       QColor("#3b82f6"))
+    pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.PlaceholderText, QColor("#94a3b8"))
+    # Disabled variants stay in the same family so combos don't flash dark.
+    pal.setColor(QPalette.ColorGroup.Disabled,
+                 QPalette.ColorRole.WindowText, QColor("#94a3b8"))
+    pal.setColor(QPalette.ColorGroup.Disabled,
+                 QPalette.ColorRole.Text,       QColor("#94a3b8"))
+    pal.setColor(QPalette.ColorGroup.Disabled,
+                 QPalette.ColorRole.ButtonText, QColor("#94a3b8"))
+    app.setPalette(pal)
+
     check_icon = Path(__file__).resolve().parents[1] / "assets" / "icons" / "check_white.svg"
     app.setStyleSheet(APP_STYLE.replace("{CHECK_ICON}", str(check_icon)))
 

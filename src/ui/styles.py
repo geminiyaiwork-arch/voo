@@ -160,36 +160,49 @@ QComboBox::drop-down {
     border: none;
     width: 24px;
 }
-QComboBox QAbstractItemView {
+/* The QComboBox popup is a separate top-level widget — we style it
+   very aggressively so it can never inherit the OS dark palette,
+   even on GNOME/KDE with prefer-dark enabled. */
+QComboBox QAbstractItemView,
+QComboBox QListView,
+QComboBox QListView::viewport,
+QComboBox QFrame,
+QComboBox QAbstractScrollArea {
     background-color: #ffffff;
+    background: #ffffff;
+    color: #0f172a;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
-    color: #0f172a;
-    selection-background-color: #dbeafe;
-    selection-color: #1e3a8a;
     padding: 4px;
     outline: 0;
+    selection-background-color: #dbeafe;
+    selection-color: #1e3a8a;
 }
-QComboBox QAbstractItemView::item {
+QComboBox QAbstractItemView::item,
+QComboBox QListView::item {
     background-color: #ffffff;
     color: #0f172a;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border: none;
-    min-height: 22px;
+    min-height: 24px;
 }
-QComboBox QAbstractItemView::item:hover {
+QComboBox QAbstractItemView::item:hover,
+QComboBox QListView::item:hover {
     background-color: #eff6ff;
     color: #1e3a8a;
 }
-QComboBox QAbstractItemView::item:selected {
+QComboBox QAbstractItemView::item:selected,
+QComboBox QListView::item:selected {
     background-color: #dbeafe;
     color: #1e3a8a;
 }
+/* Plain QListView (used elsewhere too) */
 QListView {
     background-color: #ffffff;
     color: #0f172a;
     border: 1px solid #cbd5e1;
     outline: 0;
+    alternate-background-color: #f8fafc;
 }
 QListView::item {
     background-color: #ffffff;
@@ -203,6 +216,28 @@ QListView::item:hover {
 QListView::item:selected {
     background-color: #dbeafe;
     color: #1e3a8a;
+}
+/* QMenu (right-click menus, some system menus) */
+QMenu {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    padding: 4px;
+}
+QMenu::item {
+    background-color: transparent;
+    color: #0f172a;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+}
+QMenu::separator {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 8px;
 }
 QFrame#qt_scrollarea_viewport,
 QFrame[frameShape="0"] {

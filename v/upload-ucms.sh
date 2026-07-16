@@ -10,7 +10,7 @@ VERSION="${UCMS_VERSION:-1.0.1}"
 
 # Defaults for changelog + install instructions.  Apostrophes are
 # ASCII-escaped so they can\047t break the shell.  Override via env.
-DEFAULT_CHANGELOG=$'KO\047ZGU v1.9.0 - new name, new logo, Donate section, faster streaming, fully audited'
+DEFAULT_CHANGELOG=$'KO\047ZGU v1.9.1 - new name, new logo, Donate section, faster streaming, fully audited'
 DEFAULT_INSTALL=$'Ikki marta bosib o\047rnating'
 CHANGELOG="${UCMS_CHANGELOG:-$DEFAULT_CHANGELOG}"
 INSTALL_UZ="${UCMS_INSTALL:-$DEFAULT_INSTALL}"
