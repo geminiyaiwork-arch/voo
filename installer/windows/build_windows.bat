@@ -16,7 +16,7 @@
 ::  Run from the project root:
 ::      installer\windows\build_windows.bat
 ::
-::  Output: dist\KOZGU-1.9.18-setup.exe
+::  Output: dist\KOZGU-1.9.19-setup.exe
 :: ============================================================
 setlocal enabledelayedexpansion
 
@@ -88,7 +88,7 @@ iscc installer\windows\kozgu.iss || exit /b 1
 echo.
 echo ============================================================
 echo  Build complete.
-echo  Installer:  dist\KOZGU-1.9.18-setup.exe
+echo  Installer:  dist\KOZGU-1.9.19-setup.exe
 echo  Portable :  dist\kozgu\kozgu.exe
 echo ============================================================
 echo.

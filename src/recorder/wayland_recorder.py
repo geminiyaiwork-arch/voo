@@ -372,9 +372,19 @@ class WaylandPortalRecorder:
             # trap on GNOME/KDE Wayland where portal ScreenCast is
             # damage-driven by default.
             "gst-launch-1.0", "-e",
+            # always-copy=true forces pipewiresrc to hand us plain
+            # CPU-side buffers instead of DMA-BUF / GL memory.  On
+            # Wayland compositors that offer zero-copy DMA-BUF export
+            # (Mutter, KWin, wlroots), the raw caps arrive with GPU
+            # memory descriptors that videoconvert can't consume, and
+            # the next element (x264enc) then gets caps it "rejects"
+            # — actually a caps negotiation failure a few hops
+            # upstream that surfaces as an encoder set_format warn
+            # and pipeline dies with 'not-negotiated (-4)'.
             "pipewiresrc", f"path={node_id}",
             "do-timestamp=true",
             "keepalive-time=33",
+            "always-copy=true",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", "videoconvert",
