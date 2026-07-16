@@ -402,12 +402,24 @@ class WaylandPortalRecorder:
         # =true` extra props; plain `videorate` re-timestamps
         # monotonically and doesn't confuse downstream muxers.
         target_fps = max(1, int(fps))
+        # NOTE: the second `videoconvert` before the encoder is not
+        # cosmetic — the upstream chain (pipewiresrc → videoconvert →
+        # videoscale → videorate) leaks a `max-framerate=<int>/65536`
+        # field that x264enc's set_format() rejects, so setcaps failed
+        # with 'rejected caps ... framerate=30/1'.  videoconvert
+        # renegotiates its downstream caps and strips fields not
+        # requested by the following capsfilter, so x264enc sees a
+        # clean `video/x-raw,format=I420,framerate=30/1,...`.
         parts += [
             "!", "videoscale", "method=bilinear", "add-borders=false",
             "!", f"video/x-raw,width={target_width},height={target_height},"
                   "pixel-aspect-ratio=1/1",
             "!", "videorate",
             "!", f"video/x-raw,framerate={target_fps}/1",
+            "!", "videoconvert",
+            "!", (f"video/x-raw,format=I420,width={target_width},"
+                  f"height={target_height},framerate={target_fps}/1,"
+                  "pixel-aspect-ratio=1/1,interlace-mode=progressive"),
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", *v_enc,
