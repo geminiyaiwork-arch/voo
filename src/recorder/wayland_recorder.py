@@ -379,14 +379,17 @@ class WaylandPortalRecorder:
         # `videorate` + a `framerate=fps/1` cap AFTER videoscale is
         # critical for streaming: the compositor sometimes reports 144
         # tbr / 288 tbn which Telegram/YouTube RTMPS servers drop
-        # ("stream stalled" side of "efirga uzatmayapdi").  We drop
-        # duplicates so the encoder sees the target fps exactly.
+        # ("stream stalled" side of "efirga uzatmayapdi").  We use the
+        # PLAIN videorate form — `drop-only=true skip-to-first=true`
+        # tightened the negotiation so much that pipewiresrc→videorate
+        # failed to link on some compositors and the whole pipeline
+        # never produced a single buffer.
         target_fps = max(1, int(fps))
         parts += [
             "!", "videoscale", "method=bilinear", "add-borders=false",
             "!", f"video/x-raw,width={target_width},height={target_height},"
                   "pixel-aspect-ratio=1/1",
-            "!", "videorate", "drop-only=true", "skip-to-first=true",
+            "!", "videorate",
             "!", f"video/x-raw,framerate={target_fps}/1",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
@@ -703,15 +706,29 @@ class WaylandPortalRecorder:
         # to Telegram DCs) doesn't kill the broadcast forever. Bash
         # keeps the pipe stdin open across ffmpeg retries; the kernel
         # pipe buffer absorbs the 1-2 s gap so gst never SIGPIPEs.
+        # NOTE on exit codes:
+        #   0    = clean shutdown (received SIGINT from Stop)
+        #   187  = "End of file" — the FLV pipe input never produced
+        #           data.  That means gst-launch never opened its
+        #           fdsink or died before writing.  Retrying can't help
+        #           (no data source), so we bail after 2 quick misses.
+        #   other= transient network / RTMP failure — retry with backoff.
         import shlex
         ff_quoted = " ".join(shlex.quote(a) for a in cmd)
         retry_script = (
             'trap "kill -INT $pid 2>/dev/null; wait $pid; exit 0" INT TERM;'
-            'i=0;'
+            'i=0; eof_hits=0;'
             'while [ $i -lt 20 ]; do '
             f'  {ff_quoted} & pid=$!;'
             '  wait $pid; rc=$?;'
             '  [ $rc -eq 0 ] && exit 0;'
+            '  if [ $rc -eq 187 ]; then '
+            '    eof_hits=$((eof_hits+1));'
+            '    if [ $eof_hits -ge 2 ]; then '
+            '      echo "[kozgu-relay] gst produced no data twice — giving up" 1>&2;'
+            '      exit 2;'
+            '    fi;'
+            '  fi;'
             '  echo "[kozgu-relay] ffmpeg exit rc=$rc, retry $((i+1))/20 in 2s" 1>&2;'
             '  i=$((i+1));'
             '  sleep 2;'
