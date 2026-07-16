@@ -421,7 +421,16 @@ class WaylandPortalRecorder:
         # audio branch can request a sink pad on it.
         file_muxer = [muxer_tokens[0], "name=mux"] + list(muxer_tokens[1:])
         if streaming:
-            # tee the encoded H.264 into the file muxer + flvmux (stream)
+            # tee encoded H.264 into (1) the file muxer and (2) a raw
+            # fdsink.  Version 1.9.12 wrapped the RTMP leg in flvmux,
+            # which is an aggregator — when the pipeline started with a
+            # partially-idle compositor the flvmux side would silently
+            # emit ZERO bytes even though mp4mux on the same tee wrote
+            # 140 KB.  The relay ffmpeg then saw a permanently-empty
+            # pipe and gave up with EOF.  Bypass flvmux entirely: push
+            # raw AnnexB H.264 through fdsink, and let the relay ffmpeg
+            # re-mux to FLV on the RTMP side — that ffmpeg is going to
+            # touch every byte anyway, so the extra work is free.
             parts += [
                 "!", "tee", "name=vtee",
                 "vtee.", "!", "queue",
@@ -429,8 +438,6 @@ class WaylandPortalRecorder:
                 "!", "filesink", f"location={output_path}",
                 "vtee.", "!", "queue", "max-size-buffers=2",
                 "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
-                "!", "flvmux", "name=smux", "streamable=true",
-                "latency=0",
                 "!", "fdsink", "fd=__STREAM_FD__", "sync=false",
             ]
         else:
@@ -540,6 +547,7 @@ class WaylandPortalRecorder:
                 stream_urls=stream_urls,
                 input_fd=stream_read_fd,
                 audio_source=cfg.audio_source,
+                fps=int(getattr(cfg, "fps", 30) or 30),
             )
             if not started:
                 # FFmpeg failed to launch: drop the streaming leg so
@@ -724,7 +732,8 @@ class WaylandPortalRecorder:
 
     def _start_streaming_bridge(self, stream_urls: list[str],
                                  input_fd: int,
-                                 audio_source: str = "both") -> bool:
+                                 audio_source: str = "both",
+                                 fps: int = 30) -> bool:
         """Spawn an FFmpeg subprocess that reads the GStreamer FLV
         stream from a pipe FD and forwards it to every RTMP/RTMPS
         destination via the tee muxer (one re-mux, many outputs).
@@ -744,16 +753,20 @@ class WaylandPortalRecorder:
         # `-probesize 32 -analyzeduration 0` also caused the AAC track
         # to be mis-detected on ~5% of piped FLVs → we now use 1 MB /
         # 1 s which still starts in <200 ms but never confuses the demuxer.
-        # analyzeduration bumped 1s → 5s: pipewire portal handshake
-        # + first-frame produce + FLV header takes ~1.5-2 s on real
-        # hardware, so a 1 s analyze window timed out with 'could
-        # not find codec parameters' every time.  probesize matches.
+        # Input is now RAW AnnexB H.264 straight out of gst's fdsink
+        # (no flvmux upstream — that was silently emitting 0 bytes on
+        # partially-idle Wayland desktops).  ffmpeg identifies raw H.264
+        # via '-f h264'.  probesize/analyzeduration bumped to 5 s so
+        # we survive the ~1.5-2 s portal handshake + first-buffer wait.
+        video_framerate = str(int(fps) if fps > 0 else 30)
         common_input = [
             "-fflags", "+nobuffer+genpts",
             "-flags", "+low_delay",
             "-probesize", "5000000",
             "-analyzeduration", "5000000",
-            "-f", "flv", "-i", "pipe:0",
+            "-f", "h264",
+            "-framerate", video_framerate,
+            "-i", "pipe:0",
         ]
         if len(stream_urls) == 1:
             # Direct push, simpler and lighter than tee.

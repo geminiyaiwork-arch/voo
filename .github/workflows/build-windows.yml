@@ -2,7 +2,7 @@ name: Build Windows installer
 
 # Trigger:
 #   - Every push to main
-#   - Every tag like v1.9.13  (creates a GitHub Release with the .exe attached)
+#   - Every tag like v1.9.14  (creates a GitHub Release with the .exe attached)
 #   - Manually from the Actions tab
 on:
   push:
