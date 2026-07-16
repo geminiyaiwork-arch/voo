@@ -735,11 +735,15 @@ class WaylandPortalRecorder:
         # `-probesize 32 -analyzeduration 0` also caused the AAC track
         # to be mis-detected on ~5% of piped FLVs → we now use 1 MB /
         # 1 s which still starts in <200 ms but never confuses the demuxer.
+        # analyzeduration bumped 1s → 5s: pipewire portal handshake
+        # + first-frame produce + FLV header takes ~1.5-2 s on real
+        # hardware, so a 1 s analyze window timed out with 'could
+        # not find codec parameters' every time.  probesize matches.
         common_input = [
             "-fflags", "+nobuffer+genpts",
             "-flags", "+low_delay",
-            "-probesize", "1000000",
-            "-analyzeduration", "1000000",
+            "-probesize", "5000000",
+            "-analyzeduration", "5000000",
             "-f", "flv", "-i", "pipe:0",
         ]
         if len(stream_urls) == 1:
