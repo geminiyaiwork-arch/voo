@@ -326,12 +326,20 @@ class WaylandPortalRecorder:
                 # Software fallback — superfast trades quality for speed.
                 # bframes=0 + zerolatency removes the encoder lookahead
                 # delay so time-to-first-frame at the RTMP server is minimal.
+                # `sliced-threads=true` + `threads=0` (auto) failed
+                # x264_encoder_open() on 1080p / this build combo —
+                # set_format returned FALSE and the whole pipeline
+                # bailed with 'rejected caps ... framerate=30/1'
+                # (misleading — the caps were fine, x264's internal
+                # init was what refused).  tune=zerolatency already
+                # sets bframes=0 and rc-lookahead=0, so drop those
+                # redundant flags too.
                 v_enc = [
-                    "x264enc", "tune=zerolatency", "speed-preset=superfast",
+                    "x264enc",
+                    "tune=zerolatency",
+                    "speed-preset=superfast",
                     f"bitrate={enc_bitrate}",
-                    f"key-int-max={keyint}", "bframes=0",
-                    "rc-lookahead=0", "sliced-threads=true",
-                    "threads=0",
+                    f"key-int-max={keyint}",
                     "!", "h264parse", "config-interval=-1",
                 ]
 

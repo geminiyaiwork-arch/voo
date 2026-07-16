@@ -8,7 +8,7 @@
 ; ============================================================
 
 #define MyAppName "KO'ZGU"
-#define MyAppVersion "1.9.17"
+#define MyAppVersion "1.9.18"
 #define MyAppPublisher "Elyorbek"
 #define MyAppExeName "kozgu.exe"
 #define MyAppURL "https://t.me/visio_eye"
