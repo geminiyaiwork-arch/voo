@@ -444,27 +444,24 @@ class WaylandPortalRecorder:
                 "!", "audioconvert",
                 "!", "audioresample",
             ]
-            if streaming:
-                # Tee the raw PCM so the file muxer gets `audio_kbps`
-                # and the RTMP leg is re-encoded at `stream_audio_kbps`.
-                audio_branch += [
-                    "!", "tee", "name=araw",
-                    "araw.", "!", "queue", "max-size-buffers=8",
-                    "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
-                    "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
-                    "!", "aacparse", "!", "queue", "!", "mux.",
-                    "araw.", "!", "queue", "max-size-buffers=8",
-                    "max-size-time=0", "max-size-bytes=0", "leaky=downstream",
-                    "!", "voaacenc", f"bitrate={stream_audio_kbps * 1000}",
-                    "!", "aacparse", "!", "queue", "!", "smux.",
-                ]
-            else:
-                audio_branch += [
-                    "!", "queue", "max-size-buffers=8", "max-size-time=0",
-                    "max-size-bytes=0", "leaky=downstream",
-                    "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
-                    "!", "aacparse", "!", "queue", "!", "mux.",
-                ]
+            # Audio goes ONLY to the file muxer.  Earlier revisions
+            # tee'd raw PCM to two independent voaacenc instances (192
+            # kbps → mp4mux, 160 kbps → flvmux).  Two encoders on the
+            # same PCM stream produced timestamps that disagreed by
+            # 1-10 ms, which triggered
+            #     WARN flvmux <smux:audio> Got backwards dts!
+            # every few frames.  flvmux (aggregator-strict) then
+            # stalled waiting for monotonic audio, so NO RTMP output
+            # left the pipeline and the mp4mux side of the tee
+            # backpressured too, leaving BOTH file and stream empty.
+            # Telegram/YouTube RTMPS accept video-only ingest, so we
+            # drop the audio leg of the stream to unblock the file.
+            audio_branch += [
+                "!", "queue", "max-size-buffers=8", "max-size-time=0",
+                "max-size-bytes=0", "leaky=downstream",
+                "!", "voaacenc", f"bitrate={audio_kbps * 1000}",
+                "!", "aacparse", "!", "queue", "!", "mux.",
+            ]
             parts += audio_branch
 
         return parts
