@@ -354,9 +354,19 @@ class WaylandPortalRecorder:
             # the "WARN"/"ERROR" lines and left the user staring at
             # an empty gst.log.  Default verbosity is fine — it goes
             # straight to a file, no pipe pressure.
+            # keepalive-time=33 (30 Hz): if the compositor stops
+            # sending new frames (static screen, no damage events),
+            # pipewiresrc re-emits its last buffer every 33 ms so the
+            # rest of the pipeline keeps advancing.  Without this,
+            # a paused desktop = zero buffers = pipewireclock never
+            # ticks = mp4mux/flvmux aggregators block forever and
+            # BOTH the file and the RTMP stream stay empty.  Common
+            # trap on GNOME/KDE Wayland where portal ScreenCast is
+            # damage-driven by default.
             "gst-launch-1.0", "-e",
             "pipewiresrc", f"path={node_id}",
             "do-timestamp=true",
+            "keepalive-time=33",
             "!", "queue", "max-size-buffers=2", "max-size-time=0",
             "max-size-bytes=0", "leaky=downstream",
             "!", "videoconvert",
