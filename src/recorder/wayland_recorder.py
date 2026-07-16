@@ -437,7 +437,17 @@ class WaylandPortalRecorder:
             else:
                 device = mic_device if mic_device != "default" else ""
 
-            audio_branch = ["pulsesrc"]
+            # do-timestamp=true forces pulsesrc to stamp buffers with
+            # the pipeline running-time.  Default is false, which
+            # leaves the PulseAudio-side timestamps in place — those
+            # live on a DIFFERENT clock than pipewireclock0 (which the
+            # video path uses) and mp4mux's aggregator was blocking
+            # indefinitely trying to align the two.
+            # provide-clock=false stops pulsesrc from bidding to be
+            # the pipeline clock; we want pipewireclock0 as authority.
+            audio_branch = ["pulsesrc",
+                            "do-timestamp=true",
+                            "provide-clock=false"]
             if device:
                 audio_branch.append(f"device={device}")
             audio_branch += [

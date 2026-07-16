@@ -1,12 +1,12 @@
-# KO'ZGU — Distribution Builds (v1.9.9)
+# KO'ZGU — Distribution Builds (v1.9.10)
 
 Ready-to-distribute installers for all three desktop platforms.
 
 | Platform | File | How to install |
 |----------|------|----------------|
-| Linux  | `kozgu_1.9.9_all.deb`   | `bash install-linux.sh` |
-| Windows | `KOZGU-1.9.9-setup.exe` | Double-click |
-| macOS  | `KOZGU-1.9.9.dmg`        | Open → drag to Applications |
+| Linux  | `kozgu_1.9.10_all.deb`   | `bash install-linux.sh` |
+| Windows | `KOZGU-1.9.10-setup.exe` | Double-click |
+| macOS  | `KOZGU-1.9.10.dmg`        | Open → drag to Applications |
 
 ---
 
@@ -32,7 +32,7 @@ PyQt6, faster-whisper, etc.) via `apt` + `pip`.
 
 ## Windows
 
-1. Send `KOZGU-1.9.9-setup.exe` to the user.
+1. Send `KOZGU-1.9.10-setup.exe` to the user.
 2. Double-click → **Yes** (UAC) → **Install** → **Finish**.
 3. KO'ZGU opens automatically.
 
@@ -47,7 +47,7 @@ No internet required at install time. Uninstall via Settings → Apps.
 
 ## macOS (11 Big Sur+)
 
-1. Send `KOZGU-1.9.9.dmg` to the user.
+1. Send `KOZGU-1.9.10.dmg` to the user.
 2. Double-click the .dmg.
 3. Drag **KO'ZGU** into **Applications**.
 4. Open from Launchpad.
