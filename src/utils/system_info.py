@@ -9,6 +9,8 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 import psutil
@@ -140,11 +142,18 @@ class SystemInfo:
         except OSError:
             return 0.0
 
+    # nvidia-smi cold-starts in 150-800 ms and blocks the caller thread.
+    # If the UI polled it every second on the Qt main thread, that alone
+    # produced visible "app is frozen" pauses (auditor finding #5).  We
+    # now cache the last reading and refresh at most every 5 s from a
+    # background thread, so the GUI-thread call is O(1).
+    _gpu_cache: float | None = None
+    _gpu_cache_ts: float = 0.0
+    _gpu_refresh_lock = threading.Lock()
+    _gpu_available: bool | None = None
+
     @staticmethod
-    def gpu_percent() -> float | None:
-        """Best-effort NVIDIA GPU usage. Returns None if unavailable."""
-        if not shutil.which("nvidia-smi"):
-            return None
+    def _gpu_probe_worker() -> None:
         try:
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=utilization.gpu",
@@ -152,9 +161,35 @@ class SystemInfo:
                 stderr=subprocess.DEVNULL, text=True, timeout=1,
             )
             line = out.strip().splitlines()[0]
-            return float(line)
+            SystemInfo._gpu_cache = float(line)
         except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+            SystemInfo._gpu_cache = None
+        finally:
+            SystemInfo._gpu_cache_ts = time.monotonic()
+            SystemInfo._gpu_refresh_lock.release()
+
+    @staticmethod
+    def gpu_percent() -> float | None:
+        """Best-effort NVIDIA GPU usage. Non-blocking (cached).
+
+        Returns the last cached value immediately.  If it's older than
+        5 s and no probe is currently in flight, spawn a bg thread to
+        refresh — the caller never blocks on nvidia-smi.
+        """
+        if SystemInfo._gpu_available is False:
             return None
+        if SystemInfo._gpu_available is None:
+            SystemInfo._gpu_available = shutil.which("nvidia-smi") is not None
+            if not SystemInfo._gpu_available:
+                return None
+        now = time.monotonic()
+        stale = (now - SystemInfo._gpu_cache_ts) > 5.0
+        if stale and SystemInfo._gpu_refresh_lock.acquire(blocking=False):
+            threading.Thread(
+                target=SystemInfo._gpu_probe_worker,
+                name="gpu-probe", daemon=True,
+            ).start()
+        return SystemInfo._gpu_cache
 
     # ------- camera devices -------
     @staticmethod

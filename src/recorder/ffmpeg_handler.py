@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from ._pipe_pump import StderrDrainer
+
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MACOS = sys.platform == "darwin"
@@ -104,6 +106,7 @@ class FFmpegRecorder:
         self._proc: Optional[subprocess.Popen] = None
         self._cfg: Optional[RecordConfig] = None
         self._paused = False
+        self._drainer: Optional[StderrDrainer] = None
 
     @staticmethod
     def ffmpeg_available() -> bool:
@@ -431,13 +434,13 @@ class FFmpegRecorder:
             if not url:
                 continue
             safe_url = FFmpegRecorder._tee_escape(url)
-            # Reconnect + rw_timeout live inside the tee sub-option block
-            # so they attach to *this* RTMP output (per-URL, not global).
+            # Only `onfail=ignore` + `flvflags` belong in the tee sub-
+            # block. `reconnect*` and `rw_timeout` are AVIO / RTMP
+            # protocol knobs and are silently DROPPED here (they must be
+            # top-level, before the URL, to take effect). Watchdog logic
+            # in the outer layer handles a truly-dead RTMP endpoint.
             outputs.append(
                 "[f=flv:onfail=ignore:flvflags=no_duration_filesize"
-                ":reconnect=1:reconnect_streamed=1:reconnect_at_eof=1"
-                ":reconnect_delay_max=5:rw_timeout=5000000"
-                ":listen_timeout=5000000"
                 f"]{safe_url}"
             )
         container = (cfg.container or "mp4").lower()
@@ -583,6 +586,10 @@ class FFmpegRecorder:
         else:
             kwargs["preexec_fn"] = os.setsid
         self._proc = subprocess.Popen(cmd, **kwargs)
+        # Drain stderr in a bg thread. Without this, the pipe buffer
+        # fills after a few minutes and ffmpeg blocks on write → the
+        # encode (and stream) freezes silently mid-broadcast.
+        self._drainer = StderrDrainer(self._proc)
 
     def pause(self) -> None:
         if self._proc and not self._paused:
@@ -662,13 +669,16 @@ class FFmpegRecorder:
             if self._paused:
                 self.resume()
             # Ask FFmpeg to flush its trailer by sending 'q' on stdin.
-            # We use communicate() rather than write()+wait()+read() so
-            # both stdin and stderr are pumped concurrently — otherwise a
-            # long recording that filled the stderr pipe buffer would
-            # deadlock at wait() waiting for us to drain it.
-            err_bytes = b""
+            # stderr is being pumped by StderrDrainer so wait() cannot
+            # deadlock on a full pipe.
             try:
-                _, err_bytes = self._proc.communicate(input=b"q", timeout=8)
+                if self._proc.stdin is not None:
+                    try:
+                        self._proc.stdin.write(b"q")
+                        self._proc.stdin.close()
+                    except (OSError, ValueError, BrokenPipeError):
+                        pass
+                self._proc.wait(timeout=8)
             except subprocess.TimeoutExpired:
                 if IS_WINDOWS:
                     try:
@@ -681,7 +691,7 @@ class FFmpegRecorder:
                     except ProcessLookupError:
                         pass
                 try:
-                    _, err_bytes = self._proc.communicate(timeout=4)
+                    self._proc.wait(timeout=4)
                 except subprocess.TimeoutExpired:
                     if IS_WINDOWS:
                         self._proc.kill()
@@ -691,13 +701,16 @@ class FFmpegRecorder:
                         except ProcessLookupError:
                             pass
                     try:
-                        _, err_bytes = self._proc.communicate(timeout=2)
+                        self._proc.wait(timeout=2)
                     except subprocess.TimeoutExpired:
                         pass
-            err = (err_bytes or b"").decode("utf-8", errors="ignore")
+            err = self._drainer.text() if self._drainer else ""
             code = self._proc.returncode or 0
             return code, err
         finally:
+            if self._drainer:
+                self._drainer.stop()
+            self._drainer = None
             self._proc = None
             self._cfg = None
             self._paused = False

@@ -32,6 +32,8 @@ try:
 except (ImportError, Exception):                  # pylint: disable=broad-except
     _DBUS_OK = False
 
+from ._pipe_pump import StderrDrainer
+
 
 PORTAL_BUS = "org.freedesktop.portal.Desktop"
 PORTAL_PATH = "/org/freedesktop/portal/desktop"
@@ -61,6 +63,7 @@ class WaylandPortalRecorder:
         self._bus = None
         self._sender_name: str = ""
         self._tcp_port: int = 0
+        self._proc_drainer: Optional[StderrDrainer] = None
 
     # ---------- availability ----------
     @staticmethod
@@ -562,6 +565,10 @@ class WaylandPortalRecorder:
             pass_fds=tuple(pass_fds),
             close_fds=True,
         )
+        # Drain gst-launch stderr — same reason as ffmpeg: pipe buffer
+        # fills after a few minutes of progress output and the encode
+        # freezes.
+        self._proc_drainer = StderrDrainer(self._proc)
         # Close our copies of the fds we handed to the child — gst owns
         # them now.  Not closing pipewire_fd here leaks one socket per
         # recording session.
@@ -641,15 +648,23 @@ class WaylandPortalRecorder:
         so gst never writes into a dead pipe).
         """
         has_audio = audio_source in ("mic", "both", "desktop")
+        # NOTE: `+discardcorrupt` used to be here; it aborted the whole
+        # session on the first slightly-late packet from gst.  Dropped.
+        # `-probesize 32 -analyzeduration 0` also caused the AAC track
+        # to be mis-detected on ~5% of piped FLVs → we now use 1 MB /
+        # 1 s which still starts in <200 ms but never confuses the demuxer.
+        common_input = [
+            "-fflags", "+nobuffer+genpts",
+            "-flags", "+low_delay",
+            "-probesize", "1000000",
+            "-analyzeduration", "1000000",
+            "-f", "flv", "-i", "pipe:0",
+        ]
         if len(stream_urls) == 1:
             # Direct push, simpler and lighter than tee.
             cmd = [
                 "ffmpeg", "-hide_banner", "-loglevel", "info",
-                "-fflags", "+nobuffer+discardcorrupt+genpts",
-                "-flags", "+low_delay",
-                "-probesize", "32",
-                "-analyzeduration", "0",
-                "-f", "flv", "-i", "pipe:0",
+                *common_input,
                 "-c", "copy",
                 "-flush_packets", "1",
                 "-f", "flv", stream_urls[0],
@@ -661,11 +676,7 @@ class WaylandPortalRecorder:
             )
             cmd = [
                 "ffmpeg", "-hide_banner", "-loglevel", "info",
-                "-fflags", "+nobuffer+discardcorrupt+genpts",
-                "-flags", "+low_delay",
-                "-probesize", "32",
-                "-analyzeduration", "0",
-                "-f", "flv", "-i", "pipe:0",
+                *common_input,
                 "-map", "0:v:0",
             ]
             if has_audio:
@@ -691,7 +702,10 @@ class WaylandPortalRecorder:
                 stderr=subprocess.STDOUT,
                 preexec_fn=os.setsid,
             )
-            # We've passed the fd to the child; close ours.
+            # We've passed the fd to the child; close ours. (Respawning
+            # the relay is not viable — gst holds the pipe write end
+            # and dies of SIGPIPE the instant the reader vanishes, so
+            # keeping the fd around would be a leak.)
             os.close(input_fd)
             self._stream_log = str(log_path)
             return True
@@ -757,9 +771,7 @@ class WaylandPortalRecorder:
                 except subprocess.TimeoutExpired:
                     os.killpg(os.getpgid(self._proc.pid), signal.SIGKILL)
                     self._proc.wait()
-            err = ""
-            if self._proc.stderr:
-                err = self._proc.stderr.read().decode("utf-8", errors="ignore")
+            err = self._proc_drainer.text() if self._proc_drainer else ""
             code = self._proc.returncode or 0
 
             # Stop the streaming subprocess too
@@ -776,12 +788,11 @@ class WaylandPortalRecorder:
                         self._stream_proc.wait()
                     except OSError:
                         pass
-                if self._stream_proc.stderr:
-                    self._stream_log = self._stream_proc.stderr.read().decode(
-                        "utf-8", errors="ignore"
-                    )
             return code, err
         finally:
+            if self._proc_drainer:
+                self._proc_drainer.stop()
+            self._proc_drainer = None
             self._proc = None
             self._stream_proc = None
             self._tcp_port = 0

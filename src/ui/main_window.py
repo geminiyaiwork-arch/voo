@@ -76,10 +76,12 @@ class MainWindow(QMainWindow):
         self._refresh_overlays()
         self.hotkeys.update(self._settings.get("hotkeys"))
 
-        # status timer
+        # status timer — CPU/RAM/GPU/disk poll cadence.  Was 1 s but
+        # nothing in _tick_status needs sub-2s freshness and dropping
+        # to 2 s halves the GUI-thread overhead during long recordings.
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._tick_status)
-        self._status_timer.start(1000)
+        self._status_timer.start(2000)
 
     # ---------- layout ----------
     def _build_ui(self) -> None:
