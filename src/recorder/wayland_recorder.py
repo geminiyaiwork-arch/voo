@@ -97,17 +97,34 @@ class WaylandPortalRecorder:
             candidates = ("vah264enc", "vaapih264enc", "qsvh264enc",
                           "nvcudah264enc", "nvh264enc")
         for cand in candidates:
-            try:
-                subprocess.check_output(
-                    ["gst-inspect-1.0", cand],
-                    stderr=subprocess.DEVNULL, timeout=2,
-                )
+            if cls._encoder_actually_works(cand):
                 cls._gpu_enc_cache[key] = cand
                 return cand
-            except (OSError, subprocess.SubprocessError):
-                continue
         cls._gpu_enc_cache[key] = ""
         return ""
+
+    @staticmethod
+    def _encoder_actually_works(name: str) -> bool:
+        """`gst-inspect-1.0` only proves the element *loads* — it does
+        NOT prove it can encode. nvh264enc loads fine even when
+        libnvrtc.so (NVIDIA's CUDA JIT-compiler library, shipped with
+        the CUDA *toolkit*, not the display driver) is missing; it
+        only aborts once a real buffer reaches it
+        ('could not link queue1 to nvh264enc0'), i.e. on every actual
+        recording. Push two real frames through a throwaway pipeline
+        so a GPU encoder that loads-but-can't-run falls back to the
+        next candidate instead of breaking every recording."""
+        try:
+            r = subprocess.run(
+                ["gst-launch-1.0", "-q", "videotestsrc", "num-buffers=2",
+                 "!", "video/x-raw,format=I420,width=64,height=64",
+                 "!", name, "!", "fakesink"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+            return r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
 
     @staticmethod
     def _detect_screen_size() -> tuple[int, int]:
@@ -361,19 +378,13 @@ class WaylandPortalRecorder:
             # compositor stops sending damage events. Fixes the
             # static-screen-stall class of failures on GNOME/KDE.
             #
-            # always-copy=true wasn't enough on this NVIDIA + Wayland
-            # box — pipewire NEGOTIATES DMA-BUF caps regardless of
-            # always-copy, and a plain `videoconvert !
-            # video/x-raw,format=I420` filter refused them upstream:
-            #     WARN pipewiresrc: No supported formats found —
-            #     This element does not have formats in common with
-            #     the peer.
-            # Drop the explicit format cap and use `videoconvertscale`
-            # (combined convert + scale) whose sink template accepts
-            # video/x-raw(ANY) — DMA-BUF included.  The encoder's
-            # own capsfilter downstream still pins format=I420 for
-            # openh264enc, and videoconvertscale converts on the way.
+            # ScreenCast returns a node ID, not an object serial/name.
+            # pipewiresrc's path still accepts that ID; target-object
+            # expects a serial/name and can select an unrelated source.
+            # Never fall back to the default camera if the portal node
+            # disappears or cannot be resolved.
             "pipewiresrc", f"path={node_id}",
+            "stream-properties=props,node.dont-fallback=(boolean)true",
             "do-timestamp=true",
             "keepalive-time=33",
             "always-copy=true",
@@ -619,18 +630,6 @@ class WaylandPortalRecorder:
         pass_fds = [pipewire_fd]
         if stream_write_fd >= 0:
             pass_fds.append(stream_write_fd)
-        # Route gst-launch stderr to a persistent log file (tee'd so
-        # start-up failures like "no element pipewiresrc" or portal FD
-        # revocation are visible to the user immediately, not only in
-        # the drainer buffer that stop() prints once at the very end).
-        gst_log_path = self._gst_log_path()
-        try:
-            gst_log_fh = open(gst_log_path, "ab", buffering=0)
-            gst_log_fh.write(b"\n\n===== KO'ZGU gst session =====\n")
-            gst_log_fh.write(("cmd: " + " ".join(new_args) + "\n").encode())
-            gst_log_fh.flush()
-        except OSError:
-            gst_log_fh = None
         # Force line-buffered stdio so any error / SPA assertion
         # message flushes to the log file immediately (block-buffered
         # stderr can lose the last chunk on abort()).  Merge stdout
@@ -651,28 +650,93 @@ class WaylandPortalRecorder:
         env.setdefault("GST_DEBUG_NO_COLOR", "1")
         wrapped_args = ["stdbuf", "-oL", "-eL", *new_args] \
             if shutil.which("stdbuf") else new_args
-        self._proc = subprocess.Popen(
-            wrapped_args,
-            stdin=subprocess.PIPE,
-            stdout=gst_log_fh if gst_log_fh is not None else subprocess.DEVNULL,
-            stderr=(subprocess.STDOUT if gst_log_fh is not None
-                    else subprocess.PIPE),
-            preexec_fn=os.setsid,
-            env=env,
-            pass_fds=tuple(pass_fds),
-            close_fds=True,
-        )
-        # Only wire the drainer when we DID have to fall back to PIPE
-        # (gst_log_fh open failed) — with a real file handle stderr
-        # goes straight to disk and never blocks.
-        self._proc_drainer = (
-            StderrDrainer(self._proc) if gst_log_fh is None else None
-        )
-        if gst_log_fh is not None:
+
+        # ---- spawn with a short auto-retry for the flaky first negotiation ----
+        # The very first pipewiresrc connection to a freshly-granted
+        # portal stream occasionally races the compositor and dies
+        # within ~1s. Confirmed genuinely flaky (not caused by any one
+        # specific cap/property) by direct testing: the exact same
+        # command against a fresh portal grant sometimes fails
+        # instantly ('No supported formats found', 'target not
+        # found'), sometimes fails after connecting ('error set
+        # output format: -22 (Invalid argument)' — a Mutter 50 /
+        # GStreamer pipewiresrc incompatibility), and sometimes just
+        # works — reaching PLAYING and streaming normally. Re-spawning
+        # gst-launch against the SAME already-granted fd/node (no new
+        # portal prompt, no re-consent) recovers on a later attempt.
+        # Retry on ANY early pipewiresrc-reported error rather than an
+        # enumerated string list, since new Mutter/GStreamer version
+        # combinations keep producing new error text for the same
+        # underlying flakiness. Cap at 5 tries — observed failures
+        # repeating 3-4x in a row before succeeding.
+        MAX_START_ATTEMPTS = 5
+        RETRY_PROBE_SECONDS = 1.2
+
+        def _is_transient_pipewiresrc_failure(tail: str) -> bool:
+            return "pipewiresrc0" in tail and (
+                "error" in tail.lower() or "not-negotiated" in tail)
+
+        proc = None
+        proc_drainer = None
+        for attempt in range(1, MAX_START_ATTEMPTS + 1):
+            # Route gst-launch stderr to a persistent log file (tee'd so
+            # start-up failures like "no element pipewiresrc" or portal
+            # FD revocation are visible to the user immediately, not
+            # only in the drainer buffer that stop() prints once at the
+            # very end). Re-opened fresh each attempt since the previous
+            # attempt's handle was already closed (see below).
+            gst_log_path = self._gst_log_path()
             try:
-                gst_log_fh.close()          # gst inherits its own copy
+                gst_log_fh = open(gst_log_path, "ab", buffering=0)
+                gst_log_fh.write(
+                    f"\n\n===== KO'ZGU gst session (attempt {attempt}/"
+                    f"{MAX_START_ATTEMPTS}) =====\n".encode()
+                )
+                gst_log_fh.write(("cmd: " + " ".join(new_args) + "\n").encode())
+                gst_log_fh.flush()
             except OSError:
-                pass
+                gst_log_fh = None
+
+            proc = subprocess.Popen(
+                wrapped_args,
+                stdin=subprocess.PIPE,
+                stdout=gst_log_fh if gst_log_fh is not None else subprocess.DEVNULL,
+                stderr=(subprocess.STDOUT if gst_log_fh is not None
+                        else subprocess.PIPE),
+                preexec_fn=os.setsid,
+                env=env,
+                pass_fds=tuple(pass_fds),
+                close_fds=True,
+            )
+            # Only wire the drainer when we DID have to fall back to PIPE
+            # (gst_log_fh open failed) — with a real file handle stderr
+            # goes straight to disk and never blocks.
+            proc_drainer = StderrDrainer(proc) if gst_log_fh is None else None
+            if gst_log_fh is not None:
+                try:
+                    gst_log_fh.close()      # gst inherits its own copy
+                except OSError:
+                    pass
+
+            try:
+                proc.wait(timeout=RETRY_PROBE_SECONDS)
+                died_early = True
+            except subprocess.TimeoutExpired:
+                died_early = False
+
+            if not died_early:
+                break       # still running past the probe window => healthy
+
+            if proc_drainer:
+                proc_drainer.stop()
+            tail = self._tail_gst_log(4096)
+            if (attempt < MAX_START_ATTEMPTS
+                    and _is_transient_pipewiresrc_failure(tail)):
+                continue    # retry: same fd/node, fresh gst-launch
+            break           # not a known-transient failure, or out of tries
+
+        self._proc = proc
+        self._proc_drainer = proc_drainer
         # Close our copies of the fds we handed to the child — gst owns
         # them now.  Not closing pipewire_fd here leaks one socket per
         # recording session.
@@ -700,6 +764,18 @@ class WaylandPortalRecorder:
         out = cache / "kozgu"
         out.mkdir(parents=True, exist_ok=True)
         return out / "gst.log"
+
+    @classmethod
+    def _tail_gst_log(cls, n: int = 4096) -> str:
+        try:
+            with open(cls._gst_log_path(), "rb") as fh:
+                try:
+                    fh.seek(-n, 2)
+                except OSError:
+                    fh.seek(0)
+                return fh.read().decode("utf-8", errors="ignore")
+        except OSError:
+            return ""
 
     @staticmethod
     def _resolve_record_bitrate(preset: str | None,
@@ -929,15 +1005,7 @@ class WaylandPortalRecorder:
             if self._proc_drainer:
                 err = self._proc_drainer.text()
             else:
-                try:
-                    with open(self._gst_log_path(), "rb") as fh:
-                        try:
-                            fh.seek(-4096, 2)     # last 4 KB
-                        except OSError:
-                            fh.seek(0)
-                        err = fh.read().decode("utf-8", errors="ignore")
-                except OSError:
-                    err = ""
+                err = self._tail_gst_log(4096)
             code = self._proc.returncode or 0
 
             # Stop the streaming subprocess too

@@ -705,7 +705,18 @@ class MainWindow(QMainWindow):
         self.lbl_status[1].setText(tr("main.status.idle"))
         self._record_started_at = None
 
-        msg = (err or "").strip()[:1200] or "Recording subprocess exited immediately."
+        # Surface the actual failure, not the (very long) pipeline
+        # command line — slicing raw[:1200] used to cut the log off
+        # before the real "ERROR:" lines even appeared, leaving the
+        # dialog showing nothing but the gst-launch invocation.
+        raw = (err or "").strip()
+        error_lines = [ln for ln in raw.splitlines() if "error" in ln.lower()]
+        if error_lines:
+            msg = "\n".join(error_lines[-15:])
+        elif raw:
+            msg = raw[-1200:]
+        else:
+            msg = "Recording subprocess exited immediately."
         helpful = ""
         if self.recorder.backend == "wayland":
             helpful = (
@@ -851,8 +862,9 @@ class MainWindow(QMainWindow):
             self._log(f"Saved: {out}")
             self.statusBar().showMessage(f"Saved: {out}", 8000)
         else:
-            self._log(f"FFmpeg exited with code {code}: {err.strip()[:300]}")
-            self.statusBar().showMessage(f"FFmpeg error (code {code})", 8000)
+            backend_name = "FFmpeg" if self.recorder.backend == "ffmpeg" else "Recording"
+            self._log(f"{backend_name} exited with code {code}: {err.strip()[:300]}")
+            self.statusBar().showMessage(f"{backend_name} error (code {code})", 8000)
 
     def _blink(self) -> None:
         self.lbl_rec_dot.setVisible(not self.lbl_rec_dot.isVisible())
